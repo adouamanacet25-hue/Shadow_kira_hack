@@ -1,0 +1,19 @@
+{
+  "name": "shadow-kira-bot",
+  "version": "1.0.0",
+  "description": "Shadow Kira Bot - Telegram controle WhatsApp (Baileys)",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.9",
+    "dotenv": "^16.4.5",
+    "pino": "^9.3.2",
+    "telegraf": "^4.16.3"
+  }
+}
