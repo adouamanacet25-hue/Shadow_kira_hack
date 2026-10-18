@@ -1,5 +1,4 @@
 // ☠︎︎༒︎ 𝕊ℍ𝔸𝔻𝕆𝕎 𝕂𝕀ℝ𝔸 𝔹𝕆𝕋 ༒︎☠︎︎ — Telegram (Telegraf) pilote WhatsApp (Baileys)
-// Auteur : Mr Kira Tech
 import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';
@@ -7,30 +6,16 @@ import http from 'http';
 import pino from 'pino';
 import { Telegraf, Markup } from 'telegraf';
 import makeWASocket, {
-  useMultiFileAuthState,
-  DisconnectReason,
-  fetchLatestBaileysVersion,
-  Browsers,
-  delay,
-  normalizeMessageContent,
+  useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, Browsers, delay, normalizeMessageContent,
 } from '@whiskeysockets/baileys';
 
-// ═════════════════════════ CONFIG ═════════════════════════
-const BOT_TOKEN = process.env.BOT_TOKEN;
-if (!BOT_TOKEN) throw new Error('BOT_TOKEN manquant');
-
-// IDs numeriques (-100...) des canaux/groupes Telegram a verifier. Le bot doit y etre admin.
-const REQUIRED_CHATS = (process.env.REQUIRED_CHATS || '').split(',').map(s => s.trim()).filter(Boolean);
-const SUPPORT_URL = process.env.SUPPORT_URL || 'https://t.me/';
-const ADMIN_ID = Number(process.env.ADMIN_ID || 0); // ton ID Telegram (pour /addcode)
+// ═════════════════════════ IMAGES / LIENS / CONSTANTES ═════════════════════════
+// Pour changer l'image d'un écran : remplace l'URL de sa clé dans IMG (.jpg/.png = image, .gif/.mp4 = animation)
+const BRAND = '☠︎︎༒︎ 𝕊ℍ𝔸𝔻𝕆𝕎 𝕂𝕀ℝ𝔸 𝔹𝕆𝕋 ༒︎☠︎︎';
+const AUTHOR = '⫸𝐌𝐫 𝐊𝐈𝐑𝐀┃𝗧𝗘𝗖𝗛 🌐⫷';
+const PREFIX = '.';
 const FREE_TRIES = 5;
 const TRIAL_DAYS = 90;
-const PREFIX = '.';
-const DATA_DIR = process.env.DATA_DIR || './data';
-const SESSIONS_DIR = path.join(DATA_DIR, 'sessions');
-const CACHE_DIR = path.join(DATA_DIR, 'cache');
-const DB_FILE = path.join(DATA_DIR, 'users.json');
-[SESSIONS_DIR, CACHE_DIR].forEach(d => fs.mkdirSync(d, { recursive: true }));
 
 const LINKS = {
   tgChannel: 'https://t.me/+mQ3aQpCsEqI0YmY0',
@@ -39,17 +24,26 @@ const LINKS = {
   waChannel: 'https://whatsapp.com/channel/0029Vb7WJzp84OmBD0fEEJ2X',
   waGroup: 'https://chat.whatsapp.com/IP0nFB79rMDF0nvFSMXtDR',
 };
+
+// Tes 5 images ibb.co
+const A = 'https://i.ibb.co/QFZ3vpwf/FDE696-C0-FFC0-412-F-8-B2-E-423-DE06691-BF.jpg'; // /start /menu /help
+const B = 'https://i.ibb.co/0VG7zNhY/72-C4782-A-F4-D8-40-FD-8-B30-01267-F7-A49-D0.jpg'; // link / contact / user
+const C = 'https://i.ibb.co/FbpnMrjy/FA94-BECC-1023-4-CE6-BE69-610-C2389-DC05.png';   // code promo / premium / shop
+const D = 'https://i.ibb.co/kVdX4t2S/50129-DBF-78-A2-42-F3-AE55-EC7094467-E08.jpg';   // groupes / chaînes / conversations
+const E = 'https://i.ibb.co/BHmMCtCR/4-E77-AADC-6-AF3-46-B8-B279-2176-DE790766.jpg';  // bot WhatsApp (menu, tagall…)
+
 const IMG = {
-  start: 'https://i.ibb.co/QFZ3vpwf/FDE696-C0-FFC0-412-F-8-B2-E-423-DE06691-BF.jpg',
-  link: 'https://i.ibb.co/0VG7zNhY/72-C4782-A-F4-D8-40-FD-8-B30-01267-F7-A49-D0.jpg',
-  shop: 'https://i.ibb.co/FbpnMrjy/FA94-BECC-1023-4-CE6-BE69-610-C2389-DC05.png',
-  cmd: 'https://i.ibb.co/kVdX4t2S/50129-DBF-78-A2-42-F3-AE55-EC7094467-E08.jpg',
-  waMenu: 'https://i.ibb.co/BHmMCtCR/4-E77-AADC-6-AF3-46-B8-B279-2176-DE790766.jpg',
+  // ── Telegram ──
+  start: A, menu: A, help: A, users: A,
+  pair: A, pairError: A, pairCode: A, connected: A,
+  link: B, contact: B,
+  code: C, premium: C, shop: C,
+  dash: D, profile: D, groups: D, channels: D, convs: D, conv: D, inbox: D, history: D, settings: D, notif: D,
+  ok: A, error: A, ask: D,
+  // ── WhatsApp ──
+  waMenu: E, waConnected: E, waInfo: E, waTag: E, waPing: E, waLink: E,
 };
 
-const BRAND = '☠︎︎༒︎ 𝕊ℍ𝔸𝔻𝕆𝕎 𝕂𝕀ℝ𝔸 𝔹𝕆𝕋 ༒︎☠︎︎';
-const FOOT = '<i>power by Mr Kira tech 🌐</i>';
-const L = '━━━━━━━━━━━━━━━━━━━━━━';
 const QUICK = [
   ['👋', 'Salut, je te réponds dès que possible'],
   ['✅', "D'accord 👍"],
@@ -58,6 +52,108 @@ const QUICK = [
   ['📞', "Je t'appelle bientôt"],
 ];
 const EMOJIS = ['😀', '😂', '❤️', '👍', '🙏', '🔥', '😍', '🎉'];
+
+// ═════════════════════════ TEXTES (HTML Telegram : & s'écrit &amp;) ═════════════════════════
+const T = (() => {
+// ☠︎︎༒︎ 𝕊ℍ𝔸𝔻𝕆𝕎 𝕂𝕀ℝ𝔸 𝔹𝕆𝕋 ༒︎☠︎︎ — TEXTES
+// Format Telegram = HTML. Un "&" s'écrit &amp; et un "<" s'écrit &lt;.
+// Les textes WhatsApp (waXxx) sont du texte WhatsApp : *gras*, _italique_.
+
+const p2 = (n) => String(n).padStart(2, '0');
+const dateBox = (d = new Date()) => `${p2(d.getHours())}:${p2(d.getMinutes())} / ${p2(d.getDate())} / ${p2(d.getMonth() + 1)} / ${d.getFullYear()}`;
+const dateShort = (d = new Date()) => `${p2(d.getHours())}:${p2(d.getMinutes())} — ${p2(d.getDate())}/${p2(d.getMonth() + 1)}/${d.getFullYear()}`;
+const bar = (n) => '━'.repeat(n);
+const L = bar(22);
+const FOOT = '<blockquote>power by Mr Kira tech 🌐</blockquote>';
+
+// ───────────── /start ─────────────
+const start = () =>
+  `════════════════════════════════════\n   ✦  ${BRAND}  ✦\n════════════════════════════════════\nCREATOR : ${AUTHOR}\n\n` +
+  `👋 <b>Bienvenue sur Shadow Kira Bot</b>\nRejoins nos canaux &amp; groupes pour continuer.\n\nTape /menu pour continuer 📜`;
+
+// ───────────── /menu ─────────────
+const menu = (botUser) =>
+  `${bar(19)}\n ${BRAND}\n⚜️ Auteur : Mr Kira Tech 🌐\n🔗 Lien : https://t.me/${botUser}\n` +
+  `╔══════════════════════════╗\n📜 <b>COMMANDES TÉLÉGRAM</b>\n╚══════════════════════════╝\n\n` +
+  `▶️ /start ➜ Démarrer le bot\n📋 /menu ➜ Afficher le menu\n❓ /help ➜ Aide\n🔗 /pair ➜ Lancer un appairage WhatsApp\n` +
+  `🔌 /unpair ➜ Déconnecter WhatsApp\n🎛 /wa ➜ Tableau de bord WhatsApp\n💬 /conversations ➜ Conversations\n` +
+  `📲 /link ➜ Obtenir le lien\n📩 /contact ➜ Nous contacter\n📊 /users ➜ Nombre d'utilisateurs\n` +
+  `🔐 /code ➜ Codes promo\n💎 /premium ➜ Payer le bot (${TRIAL_DAYS / 30} mois gratuits)\n🛒 /shop ➜ Outils tech\n\n` +
+  `${bar(18)}\nTape /help pour de l'aide\n${bar(18)}\n${FOOT}`;
+
+// ───────────── /help ─────────────
+const help = () =>
+  `${bar(20)}\n⚡ <b>DÉMARRAGE RAPIDE</b>\n${bar(20)}\n1️⃣ Tapez ➜ /pair\n2️⃣ Envoyez le numéro à connecter à WhatsApp\n3️⃣ Une fois connecté ✅\n` +
+  `4️⃣ Vous verrez les commandes pour contrôler ce compte depuis Telegram\n\nNB : ${FREE_TRIES} essais gratuits 🆓\n${bar(19)}`;
+
+// ───────────── /link /contact /users ─────────────
+const link = () => `📲 <b>NOS LIENS OFFICIELS</b>\n${L}\nRejoins nos canaux et groupes 👇\n${FOOT}`;
+const contact = () => `📩 <b>Support Kira Tech</b>\nClique sur le bouton ci-dessous pour contacter l'équipe.`;
+const users = (n, botUser) =>
+  `${bar(18)}\n✦  ${BRAND}  ✦\n⚜️ By Mr Kira Tech 🌐\n${bar(19)}\n╔══════════════════════════╗\n👥 Nombre d'utilisateurs : ( <b>${n}</b> ) 🚹🚺\n╚══════════════════════════╝\n🔗 Bot : https://t.me/${botUser}\n<blockquote>Mr Kira tech 🌐</blockquote>`;
+
+// ───────────── /pair ─────────────
+const pairUsage = () => `🔗 <b>APPAIRAGE WHATSAPP</b>\n${L}\nUsage :\n<code>/pair 242XXXXXXXX</code>\n\n⚠️ Sans le + devant le numéro.`;
+const pairError = () =>
+  `⚠️❌ <b>ERREUR : NUMÉRO ERRONÉ</b> ❌⚠️\n${bar(18)}\n🚫 Le numéro que tu as tapé est invalide.\n📲 Format correct : 242XXXXXXXX\n⛔ Sans le (+) devant.\n✅ Exemple : 242XXXXXXXX\n\n🔁 Réessaie : ➜ /pair 242XXXXXXXX\n${bar(19)}\n${FOOT}`;
+const pairConsent = (number) =>
+  `⚠️ <b>Avant de continuer</b>\n${L}\n• Ce numéro doit être TON numéro.\n• Le bot pourra lire et envoyer des messages sur ce compte.\n• Tu peux tout supprimer avec /unpair.\n\n📲 Numéro : <b>${number}</b>`;
+const pairWait = (number, sym) => `📡 Demande en cours pour ${number}… ${sym}`;
+const pairCode = (number, code) =>
+  `${bar(19)}\n📲 <b>PAIRING CODE</b> pour ${number} ☑️\n${bar(19)}\n╔══════════════════════════╗\n🔑 CODE DE JUMELAGE :\n╚══════════════════════════╝\n\n` +
+  `    ┌───────────────┐\n    │  <code>${code}</code>  │\n    └───────────────┘\n\n${bar(22)}\n👉 <b>INSTRUCTIONS :</b>\n${bar(22)}\n` +
+  `1️⃣ Envoie ce code au numéro à connecter 📱\n2️⃣ Va dans « Appareils liés » 🔗 ➜ « Lier un appareil » ➕\n3️⃣ Entre ce code pour associer ce bot 🤖\n\n` +
+  `${bar(22)}\n✅ Une fois connecté, tape ${PREFIX}menu pour continuer 📜\n${bar(19)}\n${FOOT}`;
+const connected = (date = dateBox()) =>
+  `✨${bar(20)}✨\n🎊🎉 <b>CONGRATULATIONS !</b> 🎉🎊\n✨${bar(20)}✨\n\n╔══════════════════════════╗\n✅ BOT ➜ Connecté 🤖\n🟢 STATUS ➜ OPEN\n📅 DATE ➜ ${date}\n⚜️ BY ➜ Mr Kira Tech ⚜️\n╚══════════════════════════╝\n${bar(20)}`;
+const controlBox = (date = dateBox()) =>
+  `╔══════════════════════════╗\n✅ BOT ➜ Connecté 🤖\n🟢 STATUS ➜ OPEN\n📅 DATE ➜ ${date}\n⚜️ BY ➜ Mr Kira Tech ⚜️\n╚══════════════════════════╝`;
+
+// ───────────── Tableau de bord ─────────────
+const dashboard = (d) =>
+  `<b>BOT :</b> ${BRAND}\n<b>User :</b> +${d.number}\n<b>Statut :</b> OPEN ✅\n\n—————————————————\n<b>LISTE DES GROUPES 👥</b>\n—————————————————\nNombre : [ ${d.groups} ]\nAdmin : [ ${d.gAdmin} ]\n\n` +
+  `—————————————————\n<b>LISTE DES CHAÎNES 📊</b>\n—————————————————\nNombre : [ ${d.news} ]\nAdmin : [ ${d.cAdmin} ]\n\n` +
+  `—————————————————\n<b>CONVERSATION 💬</b>\n—————————————————\nNombre : [ ${d.total} ]\nContacts non enregistrés : [ ${d.unsaved} ]\n—————————————————`;
+
+// ───────────── Conversations ─────────────
+const convMenu = (d) =>
+  `${L}\n💬 <b>GESTION DES CONVERSATIONS</b>\n${L}\n<b>BOT  :</b> ${BRAND}\n<b>User :</b> +${d.number}\n<b>Statut :</b> OPEN ✅\n${L}\n` +
+  `📊 Total conversations : [ ${d.total} ]\n💬 Non lues : [ ${d.unread} ]\n👤 Contacts : [ ${d.contacts} ]\n👥 Groupes : [ ${d.groups} ]\n📢 Chaînes : [ ${d.news} ]\n${L}`;
+const search = () => `${L}\n🔍 <b>RECHERCHE</b>\n${L}\nTape un :\n➜ Nom du contact\n➜ Numéro de téléphone\n➜ Mot-clé dans les messages`;
+const sent = (name, date = dateShort()) => `✅ <b>Message envoyé à ${name}</b>\n📅 ${date}`;
+const incoming = (d) =>
+  `🔔 <b>NOUVEAU MESSAGE</b>\n${bar(20)}\n${d.where}👤 De : ${d.who} (${d.num})\n💬 Message : ${d.text}\n📅 ${dateShort()}`;
+const revoked = (n) => `Félicitations 🎊\nCommande : réussie ✅\nAdmins retirés : 🗑\nNombre 📊 : [ ${n} ]`;
+
+// ───────────── Premium / codes / shop ─────────────
+const premium = (status) =>
+  `💎 <b>PREMIUM</b>\n${L}\n${status}\n\n✔️ Appairages illimités\n✔️ Support prioritaire\n\n🎁 ${TRIAL_DAYS / 30} mois offerts à la première activation.\n${FOOT}`;
+const code = () => `🔐 <b>CODES PROMO</b>\n${L}\nEntre ton code :\n<code>/code TONCODE</code>\n${FOOT}`;
+const shop = () => `🛒 <b>BOUTIQUE KIRA TECH</b>\n${L}\nOutils et services tech.\nContacte le support pour le catalogue et les prix.\n${FOOT}`;
+
+// ───────────── WhatsApp (texte WhatsApp, pas HTML) ─────────────
+const waConnected = (date = dateBox()) =>
+  `▉ *KIRA TECH SHADOW B0T* 🌹▉\n\n╔══════════════════════════╗\n║   🎭  KIRA TECH SHADOW  🎭   ║\n╚══════════════════════════╝\n\n` +
+  `┌──────────────────────────┐\n│  ✅  BOT         ➜  Connecté 🤖\n│  🟢  STATUS      ➜  OPEN\n│  📅  DATE        ➜  ${date}\n│  ⚜️  AUTEUR      ➜  Mr Kira Tech 🌐\n│  🔧  PREFIX      ➜  [ ${PREFIX} ]\n└──────────────────────────┘\n\nTape *${PREFIX}menu* pour voir les commandes 📜`;
+const waMenu = () =>
+  `▉ *KIRA TECH SHADOW B0T* 🌹▉\n\n╔══════════════════════════╗\n   📜 *MENU WHATSAPP*\n╚══════════════════════════╝\n\n` +
+  `${PREFIX}menu ➜ Afficher ce menu\n${PREFIX}ping ➜ Vitesse du bot\n${PREFIX}tagall ➜ Mentionner tout le groupe\n${PREFIX}hidetag texte ➜ Mention cachée\n${PREFIX}link ➜ Lien d'invitation du groupe\n${PREFIX}infos ➜ Infos du groupe\n\n` +
+  `➠ Auteur : Mr Kira Tech 🌐\n➠ Prefix : [ ${PREFIX} ]\n> power by Mr Kira tech 🌐`;
+  return { dateBox, dateShort, L, FOOT, start, menu, help, link, contact, users, pairUsage, pairError, pairConsent, pairWait, pairCode, connected, controlBox, dashboard, convMenu, search, sent, incoming, revoked, premium, code, shop, waConnected, waMenu };
+})();
+
+const { L, FOOT } = T;
+
+// ═════════════════════════ CONFIG (variables d'environnement) ═════════════════════════
+const BOT_TOKEN = process.env.BOT_TOKEN;
+if (!BOT_TOKEN) throw new Error('BOT_TOKEN manquant');
+const SUPPORT_URL = process.env.SUPPORT_URL || 'https://t.me/';
+const ADMIN_ID = Number(process.env.ADMIN_ID || 0);
+const DATA_DIR = process.env.DATA_DIR || './data';
+const SESSIONS_DIR = path.join(DATA_DIR, 'sessions');
+const CACHE_DIR = path.join(DATA_DIR, 'cache');
+const DB_FILE = path.join(DATA_DIR, 'users.json');
+[SESSIONS_DIR, CACHE_DIR].forEach((d) => fs.mkdirSync(d, { recursive: true }));
 const NUM = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣'];
 const PAGE = 8;
 
@@ -67,7 +163,7 @@ try { db = { ...db, ...JSON.parse(fs.readFileSync(DB_FILE, 'utf8')) }; } catch {
 const saveDb = () => fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
 const DEFAULT_SETTINGS = { notif: 'all', preview: true, read: false, save: false };
 function getUser(id) {
-  const u = db.users[id] ||= { tries: 0, verified: false, joinedAt: Date.now() };
+  const u = (db.users[id] ||= { tries: 0, joinedAt: Date.now() });
   u.settings = { ...DEFAULT_SETTINGS, ...(u.settings || {}) };
   u.channels ||= [];
   u.templates ||= [];
@@ -80,7 +176,6 @@ const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').
 const p2 = (n) => String(n).padStart(2, '0');
 const trunc = (s, n) => { s = String(s ?? '').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 const toNum = (v) => (typeof v === 'number' ? v : v?.toNumber ? v.toNumber() : Number(v) || 0);
-const fmtDate = (d = new Date()) => `${p2(d.getHours())}:${p2(d.getMinutes())} / ${p2(d.getDate())} / ${p2(d.getMonth() + 1)} / ${d.getFullYear()}`;
 const fmtTime = (ts) => {
   if (!ts) return '--:--';
   const d = new Date(ts * 1000), n = new Date();
@@ -91,32 +186,51 @@ const numOf = (jid) => '+' + userPart(jid);
 const isGroup = (jid) => String(jid).endsWith('@g.us');
 const b = (t, d) => Markup.button.callback(t, d);
 const kb = (rows) => Markup.inlineKeyboard(rows);
+const cancelKb = kb([[b('❌ Annuler', 'cancel')]]);
 const logger = pino({ level: 'silent' });
 const bot = new Telegraf(BOT_TOKEN);
 const sessions = new Map(); // telegramId -> session WhatsApp
 const states = new Map();   // telegramId -> saisie en attente
 
+// ───────── Envoi Telegram : image + texte + boutons ─────────
 async function send(chatId, { img, text, kb: markup }) {
   const extra = { parse_mode: 'HTML', ...(markup || {}) };
   if (img) {
     try {
-      if (text.length <= 1000) return await bot.telegram.sendPhoto(chatId, img, { caption: text, ...extra });
-      await bot.telegram.sendPhoto(chatId, img);
-    } catch (e) { /* image indisponible : on envoie le texte seul */ }
+      const fn = /\.(gif|mp4)(\?|$)/i.test(img) ? 'sendAnimation' : 'sendPhoto';
+      if (text.length <= 1000) return await bot.telegram[fn](chatId, img, { caption: text, ...extra });
+      await bot.telegram[fn](chatId, img); // texte trop long pour une légende : image puis texte
+    } catch (e) { console.error('Image KO:', e.message); }
   }
   return bot.telegram.sendMessage(chatId, text.slice(0, 4000), { ...extra, link_preview_options: { is_disabled: true } });
 }
-async function screen(ctx, o) {
+const chatOf = (to) => (typeof to === 'object' ? to.chat.id : to);
+const say = (to, key, text, markup) => send(chatOf(to), { img: IMG[key] || IMG.start, text, kb: markup });
+const show = (ctx, key, text, markup) => { // navigation : remplace le message du bouton
   if (ctx.callbackQuery) ctx.deleteMessage().catch(() => {});
-  return send(ctx.chat.id, o);
-}
+  return say(ctx, key, text, markup);
+};
+const ok = (ctx, text, markup) => say(ctx, 'ok', text, markup);
+const ask = (ctx, text) => say(ctx, 'ask', text, cancelKb);
 const H = (fn) => async (ctx, next) => {
   try { await fn(ctx, next); } catch (e) {
     console.error(e);
-    await ctx.reply('❌ Erreur : ' + (e?.message || e)).catch(() => {});
+    await say(ctx, 'error', `❌ <b>Erreur</b>\n${esc(e?.message || e)}`).catch(() => {});
   }
 };
 const ack = (ctx, t, alert = false) => ctx.answerCbQuery(t, { show_alert: alert }).catch(() => {});
+
+// ───────── Petite animation de chargement (message modifié en boucle) ─────────
+async function loader(chatId, textFn) {
+  const syms = ['🔄', '🔃', '⏳', '⌛'];
+  let i = 0;
+  const m = await bot.telegram.sendMessage(chatId, textFn(syms[0])).catch(() => null);
+  const t = setInterval(() => {
+    i++;
+    if (m) bot.telegram.editMessageText(chatId, m.message_id, undefined, textFn(syms[i % 4])).catch(() => {});
+  }, 700);
+  return async () => { clearInterval(t); if (m) await bot.telegram.deleteMessage(chatId, m.message_id).catch(() => {}); };
+}
 
 // ═════════════════════════ SESSION WHATSAPP ═════════════════════════
 const cacheFile = (uid) => path.join(CACHE_DIR, `${uid}.json`);
@@ -170,8 +284,9 @@ function ingestContact(s, c) {
 function parseMsg(message) {
   const c = normalizeMessageContent(message);
   if (!c) return null;
-  if (c.conversation) return { kind: /https?:\/\//i.test(c.conversation) ? 'link' : 'text', text: c.conversation };
-  if (c.extendedTextMessage) { const t = c.extendedTextMessage.text || ''; return { kind: /https?:\/\//i.test(t) ? 'link' : 'text', text: t }; }
+  const link = (t) => (/https?:\/\//i.test(t) ? 'link' : 'text');
+  if (c.conversation) return { kind: link(c.conversation), text: c.conversation };
+  if (c.extendedTextMessage) { const t = c.extendedTextMessage.text || ''; return { kind: link(t), text: t }; }
   if (c.imageMessage) return { kind: 'image', text: '🖼 ' + (c.imageMessage.caption || 'Image') };
   if (c.videoMessage) return { kind: 'video', text: '📹 ' + (c.videoMessage.caption || 'Vidéo') };
   if (c.audioMessage) return { kind: 'audio', text: c.audioMessage.ptt ? '🎤 Vocal' : '🎵 Audio' };
@@ -195,7 +310,7 @@ function ingestMsg(s, m, live) {
     fromMe: !!m.key.fromMe, who: m.key.fromMe ? 'Moi' : (m.pushName || nameOf(s, m.key.participant || jid)), ...p,
   };
   const arr = (s.cache.msgs[jid] ||= []);
-  if (!arr.some(x => x.id === e.id)) { arr.push(e); if (arr.length > 300) arr.shift(); }
+  if (!arr.some((x) => x.id === e.id)) { arr.push(e); if (arr.length > 300) arr.shift(); }
   if (jid.endsWith('@newsletter')) { addNews(s, jid); return e; }
   const c = (s.cache.chats[jid] ||= { jid, unread: 0, ts: 0 });
   if (e.ts >= (c.ts || 0)) { c.ts = e.ts; c.text = e.text; c.fromMe = e.fromMe; }
@@ -205,11 +320,8 @@ function ingestMsg(s, m, live) {
 }
 const selfJid = (s) => userPart(s.sock.user?.id) + '@s.whatsapp.net';
 const selfIds = (s) => [userPart(s.sock.user?.id), userPart(s.sock.user?.lid)].filter(Boolean);
-function adminRole(g, s) {
-  const me = selfIds(s);
-  const p = g.participants.find(p => me.includes(userPart(p.id)) || me.includes(userPart(p.lid)) || me.includes(userPart(p.phoneNumber)));
-  return p?.admin || null; // 'admin' | 'superadmin' | null
-}
+const isMe = (s, p) => { const me = selfIds(s); return me.includes(userPart(p.id)) || me.includes(userPart(p.lid)) || me.includes(userPart(p.phoneNumber)); };
+const adminRole = (g, s) => g.participants.find((p) => isMe(s, p))?.admin || null; // 'admin' | 'superadmin' | null
 async function fetchGroups(s) {
   const all = await s.sock.groupFetchAllParticipating();
   s.groups = all;
@@ -238,6 +350,12 @@ async function resolveNumber(s, text) {
   return r?.[0]?.exists ? r[0].jid : null;
 }
 
+// ───────── WhatsApp : message avec image + légende (repli texte si l'image échoue) ─────────
+async function waSay(sock, jid, key, text, extra = {}, opts = {}) {
+  try { return await sock.sendMessage(jid, { image: { url: IMG[key] || IMG.waMenu }, caption: text, ...extra }, opts); }
+  catch { return sock.sendMessage(jid, { text, ...extra }, opts); }
+}
+
 async function connectWA(uid, { number = null, fresh = false } = {}) {
   const dir = path.join(SESSIONS_DIR, String(uid));
   const { state, saveCreds } = await useMultiFileAuthState(dir);
@@ -259,14 +377,9 @@ async function connectWA(uid, { number = null, fresh = false } = {}) {
       s.number = userPart(sock.user?.id);
       if (s.fresh) {
         s.fresh = false;
-        await send(uid, {
-          img: IMG.start,
-          text: `✨${L}✨\n🎊🎉 <b>CONGRATULATIONS !</b> 🎉🎊\n✨${L}✨\n\n╔══════════════════════════╗\n✅ BOT ➜ Connecté 🤖\n🟢 STATUS ➜ OPEN\n📅 DATE ➜ ${fmtDate()}\n⚜️ BY ➜ Mr Kira Tech ⚜️\n╚══════════════════════════╝`,
-        }).catch(() => {});
-        await sock.sendMessage(selfJid(s), {
-          image: { url: IMG.waMenu },
-          caption: `▉ KIRA TECH SHADOW B0T 🌹▉\n\n╔══════════════════════════╗\n║   🎭  KIRA TECH SHADOW  🎭   ║\n╚══════════════════════════╝\n\n✅ BOT ➜ Connecté 🤖\n🟢 STATUS ➜ OPEN\n📅 ${fmtDate()}\n\n➠ Auteur : Mr Kira Tech 🌐\n➠ Prefix : [ ${PREFIX} ]\n➠ Tape ${PREFIX}menu`,
-        }).catch(() => {});
+        await say(uid, 'connected', T.connected()).catch(() => {});
+        await say(uid, 'connected', T.controlBox()).catch(() => {});
+        await waSay(sock, selfJid(s), 'waConnected', T.waConnected()).catch(() => {});
         setTimeout(() => showDashboard(uid, null).catch(() => {}), 7000);
       }
     }
@@ -276,27 +389,27 @@ async function connectWA(uid, { number = null, fresh = false } = {}) {
       if (code === DisconnectReason.loggedOut) {
         fs.rmSync(dir, { recursive: true, force: true });
         sessions.delete(uid);
-        return bot.telegram.sendMessage(uid, '🔌 WhatsApp a été déconnecté. Refais /pair pour te reconnecter.').catch(() => {});
+        return say(uid, 'error', '🔌 WhatsApp a été déconnecté.\nRefais /pair pour te reconnecter.').catch(() => {});
       }
       if (state.creds.registered || code === DisconnectReason.restartRequired) {
         setTimeout(() => connectWA(uid).catch(console.error), 3000);
       } else {
         fs.rmSync(dir, { recursive: true, force: true });
         sessions.delete(uid);
-        bot.telegram.sendMessage(uid, '⌛ Pairage expiré ou échoué. Refais /pair.').catch(() => {});
+        say(uid, 'error', '⌛ Pairage expiré ou échoué.\nRefais /pair.').catch(() => {});
       }
     }
   });
 
   sock.ev.on('messaging-history.set', ({ chats = [], contacts = [], messages = [] }) => {
-    contacts.forEach(c => ingestContact(s, c));
-    chats.forEach(c => ingestChat(s, c));
-    messages.forEach(m => ingestMsg(s, m, false));
+    contacts.forEach((c) => ingestContact(s, c));
+    chats.forEach((c) => ingestChat(s, c));
+    messages.forEach((m) => ingestMsg(s, m, false));
   });
-  sock.ev.on('contacts.upsert', (cs) => cs.forEach(c => ingestContact(s, c)));
-  sock.ev.on('contacts.update', (cs) => cs.forEach(c => ingestContact(s, c)));
-  sock.ev.on('chats.upsert', (cs) => cs.forEach(c => ingestChat(s, c)));
-  sock.ev.on('chats.update', (cs) => cs.forEach(c => ingestChat(s, c)));
+  sock.ev.on('contacts.upsert', (cs) => cs.forEach((c) => ingestContact(s, c)));
+  sock.ev.on('contacts.update', (cs) => cs.forEach((c) => ingestContact(s, c)));
+  sock.ev.on('chats.upsert', (cs) => cs.forEach((c) => ingestChat(s, c)));
+  sock.ev.on('chats.update', (cs) => cs.forEach((c) => ingestChat(s, c)));
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     for (const m of messages) {
       try {
@@ -305,7 +418,7 @@ async function connectWA(uid, { number = null, fresh = false } = {}) {
         if (e.fromMe) {
           if ((e.kind === 'text' || e.kind === 'link') && e.text.startsWith(PREFIX) && !s.done.has(e.id) && Date.now() / 1000 - e.ts < 90) {
             s.done.add(e.id);
-            await waCommand(s, m, e.text);
+            await waCommand(s, m, e);
           }
         } else if (type === 'notify') {
           await notifyIncoming(s, m, e);
@@ -323,33 +436,21 @@ async function connectWA(uid, { number = null, fresh = false } = {}) {
 }
 
 // ═════════════════════════ COMMANDES WHATSAPP (prefix .) ═════════════════════════
-async function waCommand(s, m, text) {
+async function waCommand(s, m, e) {
   const sock = s.sock, jid = m.key.remoteJid;
-  const [cmd, ...args] = text.slice(PREFIX.length).trim().split(/\s+/);
-  const reply = (content) => sock.sendMessage(jid, content, { quoted: m });
+  const [cmd, ...args] = e.text.slice(PREFIX.length).trim().split(/\s+/);
+  const say2 = (key, text, extra) => waSay(sock, jid, key, text, extra, { quoted: m });
   switch (cmd.toLowerCase()) {
-    case 'menu':
-      return sock.sendMessage(jid, {
-        image: { url: IMG.waMenu },
-        caption: `▉ KIRA TECH SHADOW B0T 🌹▉\n\n╔══════════════════════════╗\n   📜 MENU WHATSAPP\n╚══════════════════════════╝\n\n` +
-          `${PREFIX}menu ➜ Afficher ce menu\n${PREFIX}ping ➜ Vitesse du bot\n${PREFIX}tagall ➜ Mentionner tout le groupe\n${PREFIX}hidetag texte ➜ Message avec mention cachée\n` +
-          `${PREFIX}link ➜ Lien d'invitation du groupe\n${PREFIX}infos ➜ Infos du groupe\n\n➠ Auteur : Mr Kira Tech 🌐\n➠ Prefix : [ ${PREFIX} ]`,
-      }, { quoted: m });
-    case 'ping': {
-      const t = Date.now();
-      const sent = await reply({ text: '🏓 Pong…' });
-      return sock.sendMessage(jid, { text: `🏓 Pong ! ${Date.now() - t} ms`, edit: sent.key });
-    }
+    case 'menu': return say2('waMenu', T.waMenu());
+    case 'ping': return say2('waPing', `🏓 *Pong !*\n⚡ Vitesse : ${Math.max(0, Date.now() - e.ts * 1000)} ms\n🟢 Statut : OPEN`);
     case 'tagall': case 'hidetag': case 'link': case 'infos': {
-      if (!isGroup(jid)) return reply({ text: '⚠️ Commande réservée aux groupes.' });
+      if (!isGroup(jid)) return say2('waInfo', '⚠️ Commande réservée aux groupes.');
       const g = await sock.groupMetadata(jid);
-      const mentions = g.participants.map(p => p.id);
-      if (cmd === 'tagall') {
-        return reply({ text: `📢 *TAG ALL*\n${args.join(' ')}\n\n` + mentions.map(j => `@${userPart(j)}`).join('\n'), mentions });
-      }
-      if (cmd === 'hidetag') return reply({ text: args.join(' ') || '📢', mentions });
-      if (cmd === 'link') return reply({ text: 'https://chat.whatsapp.com/' + (await sock.groupInviteCode(jid)) });
-      return reply({ text: `👥 *${g.subject}*\n👤 Membres : ${g.participants.length}\n👑 Admins : ${g.participants.filter(p => p.admin).length}\n📅 Créé : ${new Date(g.creation * 1000).toLocaleDateString('fr-FR')}` });
+      const mentions = g.participants.map((p) => p.id);
+      if (cmd === 'tagall') return say2('waTag', `📢 *TAG ALL*\n${args.join(' ')}\n\n` + mentions.map((j) => `@${userPart(j)}`).join('\n'), { mentions });
+      if (cmd === 'hidetag') return say2('waTag', args.join(' ') || '📢', { mentions });
+      if (cmd === 'link') return say2('waLink', `🔗 *Lien du groupe*\nhttps://chat.whatsapp.com/${await sock.groupInviteCode(jid)}`);
+      return say2('waInfo', `👥 *${g.subject}*\n👤 Membres : ${g.participants.length}\n👑 Admins : ${g.participants.filter((p) => p.admin).length}\n📅 Créé : ${new Date(g.creation * 1000).toLocaleDateString('fr-FR')}`);
     }
   }
 }
@@ -361,28 +462,30 @@ async function notifyIncoming(s, m, e) {
   const st = getUser(s.uid).settings, grp = isGroup(jid);
   if (st.notif === 'none' || (st.notif === 'groups' && !grp) || (st.notif === 'contacts' && grp)) return;
   if (s.cache.chats[jid]?.mutedLocal) return;
-  const who = m.pushName || nameOf(s, m.key.participant || jid);
-  const num = numOf(m.key.participant || jid);
-  const where = grp ? `👥 Groupe : ${esc(await groupName(s, jid))}\n` : '';
   const id = ref(s, jid);
-  await send(s.uid, {
-    text: `🔔 <b>NOUVEAU MESSAGE</b>\n${L}\n${where}👤 De : ${esc(who)} (${esc(num)})\n` +
-      (st.preview ? `💬 Message : « ${esc(trunc(e.text, 500))} »\n` : '💬 Message : (aperçu masqué)\n') + `📅 ${fmtDate()}`,
-    kb: kb([[b('✍️ Répondre', `c:reply:${id}`), b('📜 Ouvrir', `c:open:${id}`)], [b('🔕 Mute', `c:mute:${id}`), b('🗑 Supprimer', `c:del:${id}`)]]),
-  });
+  await say(s.uid, 'notif', T.incoming({
+    where: grp ? `👥 Groupe : ${esc(await groupName(s, jid))}\n` : '',
+    who: esc(m.pushName || nameOf(s, m.key.participant || jid)),
+    num: esc(numOf(m.key.participant || jid)),
+    text: st.preview ? `« ${esc(trunc(e.text, 500))} »` : '(aperçu masqué)',
+  }), kb([[b('✍️ Répondre', `c:reply:${id}`), b('📜 Ouvrir la conversation', `c:open:${id}`)], [b('🔕 Mute cette conversation', `c:mute:${id}`), b('🗑 Supprimer', `c:del:${id}`)]]));
 }
 
-// ═════════════════════════ ACCES / VERIFICATION ═════════════════════════
-async function missingChats(userId) {
-  const missing = [];
-  for (const chatId of REQUIRED_CHATS) {
-    try {
-      const m = await bot.telegram.getChatMember(chatId, userId);
-      if (!['member', 'administrator', 'creator'].includes(m.status)) missing.push(chatId);
-    } catch { missing.push(chatId); }
-  }
-  return missing;
-}
+// ═════════════════════════ MIDDLEWARE ═════════════════════════
+bot.use(async (ctx, next) => {
+  if (!ctx.from) return;
+  if (ctx.message?.text?.startsWith('/')) states.delete(ctx.from.id); // une commande annule la saisie en attente
+  return next();
+});
+const needWA = async (ctx) => {
+  const s = sessions.get(ctx.from.id);
+  if (s?.ready) return s;
+  if (ctx.callbackQuery) await ack(ctx, '⚠️ Aucun WhatsApp connecté. Tape /pair', true);
+  else await say(ctx, 'error', '⚠️ Aucun WhatsApp connecté.\nTape <code>/pair 242XXXXXXXX</code>');
+  return null;
+};
+
+// ═════════════════════════ COMMANDES DE BASE ═════════════════════════
 const linkRows = () => [
   [Markup.button.url('📢 Suivre la chaîne Telegram', LINKS.tgChannel)],
   [Markup.button.url('1️⃣ Rejoindre le groupe 1', LINKS.tgGroup1)],
@@ -390,83 +493,33 @@ const linkRows = () => [
   [Markup.button.url('📢 Suivre la chaîne WhatsApp', LINKS.waChannel)],
   [Markup.button.url('🌐 Rejoindre le groupe WhatsApp', LINKS.waGroup)],
 ];
-const access = H(async (ctx, next) => {
-  if (getUser(ctx.from.id).verified) return next();
-  await ctx.reply('🔒 Accès refusé. Tape /start puis clique sur ✅ Vérifier.');
-});
-bot.use(async (ctx, next) => {
-  if (!ctx.from) return;
-  if (ctx.message?.text?.startsWith('/')) states.delete(ctx.from.id);
-  if (ctx.callbackQuery && !['verify', 'cancel'].includes(ctx.callbackQuery.data) && !getUser(ctx.from.id).verified) {
-    return ack(ctx, '🔒 Accès refusé : tape /start et vérifie.', true);
-  }
-  return next();
-});
-const needWA = async (ctx) => {
-  const s = sessions.get(ctx.from.id);
-  if (s?.ready) return s;
-  if (ctx.callbackQuery) await ack(ctx, '⚠️ Aucun WhatsApp connecté. Tape /pair', true);
-  else await ctx.reply('⚠️ Aucun WhatsApp connecté. Tape /pair 242XXXXXXXX');
-  return null;
-};
-
-// ═════════════════════════ COMMANDES TELEGRAM DE BASE ═════════════════════════
 bot.start(H(async (ctx) => {
-  getUser(ctx.from.id);
-  await send(ctx.chat.id, {
-    img: IMG.start,
-    text: `════════════════════════════════════\n   ✦  ${BRAND} ✦\n════════════════════════════════════\nCREATOR : ⫸𝐌𝐫 𝐊𝐈𝐑𝐀┃𝗧𝗘𝗖𝗛 🌐⫷\n\n👋 <b>Bienvenue sur Shadow Kira Bot</b>\nRejoins nos canaux et groupes pour continuer.`,
-    kb: kb([...linkRows(), [b('✅ Vérifier', 'verify')]]),
-  });
+  getUser(ctx.from.id); saveDb();
+  await say(ctx, 'start', T.start(), kb([...linkRows(), [b('📋 Ouvrir le menu', 'm:menu')]]));
 }));
-bot.action('verify', H(async (ctx) => {
-  await ack(ctx);
-  const miss = await missingChats(ctx.from.id);
-  if (miss.length) return ctx.reply(`❌ Accès refusé.\nIl te manque ${miss.length} canal(aux)/groupe(s) à rejoindre.\nRejoins-les puis clique à nouveau sur ✅ Vérifier.`);
-  getUser(ctx.from.id).verified = true; saveDb();
-  await ctx.reply('Accès autorisé ✅\nTape /menu pour continuer');
+const menuKb = kb([[b('🎛 Tableau de bord', 'm:dash'), b('💬 Conversations', 'm:conv')], [b('🔗 Appairer WhatsApp', 'm:pairhelp')]]);
+bot.command('menu', H((ctx) => say(ctx, 'menu', T.menu(ctx.botInfo.username), menuKb)));
+bot.action('m:menu', H(async (ctx) => { await ack(ctx); await show(ctx, 'menu', T.menu(ctx.botInfo.username), menuKb); }));
+bot.action('m:pairhelp', H(async (ctx) => { await ack(ctx); await say(ctx, 'pair', T.pairUsage()); }));
+bot.command('help', H((ctx) => say(ctx, 'help', T.help())));
+bot.command('link', H((ctx) => say(ctx, 'link', T.link(), kb(linkRows()))));
+bot.command('contact', H((ctx) => say(ctx, 'contact', T.contact(), kb([[Markup.button.url('💬 Contacter le support', SUPPORT_URL)]]))));
+bot.command('users', H((ctx) => {
+  const u = ctx.botInfo.username;
+  return say(ctx, 'users', T.users(Object.keys(db.users).length, u), kb([[Markup.button.url('📤 Partager le lien du bot', `https://t.me/share/url?url=https://t.me/${u}`)]]));
 }));
 bot.action('cancel', H(async (ctx) => { states.delete(ctx.from.id); await ack(ctx, 'Annulé'); ctx.deleteMessage().catch(() => {}); }));
 
-const menuText = () => `${L}\n ${BRAND}\n⚜️ Auteur : Mr Kira Tech 🌐\n╔══════════════════════════╗\n📜 <b>COMMANDES TÉLÉGRAM</b>\n╚══════════════════════════╝\n\n` +
-  `▶️ /start ➜ Démarrer le bot\n📋 /menu ➜ Afficher le menu\n❓ /help ➜ Aide\n🔗 /pair ➜ Appairage WhatsApp\n🔌 /unpair ➜ Déconnecter WhatsApp\n🎛 /wa ➜ Tableau de bord WhatsApp\n💬 /conversations ➜ Conversations\n` +
-  `📲 /link ➜ Nos liens\n📩 /contact ➜ Nous contacter\n📊 /users ➜ Nombre d'utilisateurs\n🔐 /code ➜ Codes promo\n💎 /premium ➜ Premium (3 mois gratuits)\n🛒 /shop ➜ Boutique\n\n${L}\nTape /help pour de l'aide\n${FOOT}`;
-bot.command('menu', access, H((ctx) => send(ctx.chat.id, { img: IMG.start, text: menuText(), kb: kb([[b('🎛 Tableau de bord', 'm:dash'), b('💬 Conversations', 'm:conv')]]) })));
-bot.command('help', H((ctx) => send(ctx.chat.id, {
-  img: IMG.start,
-  text: `${L}\n⚡ <b>DÉMARRAGE RAPIDE</b>\n${L}\n1️⃣ Tapez ➜ /pair 242XXXXXXXX\n2️⃣ Entrez le code dans WhatsApp ➜ Appareils liés\n3️⃣ Une fois connecté ✅\n4️⃣ Pilotez ce compte depuis Telegram (/wa)\n\nNB : ${FREE_TRIES} essais gratuits 🆓\n${L}`,
-})));
-bot.command('link', H((ctx) => send(ctx.chat.id, { img: IMG.link, text: `📲 <b>Nos liens officiels</b>\n${FOOT}`, kb: kb(linkRows()) })));
-bot.command('contact', H((ctx) => send(ctx.chat.id, {
-  img: IMG.link, text: '📩 <b>Support Kira Tech</b>\nClique sur le bouton ci-dessous pour contacter l\'équipe.',
-  kb: kb([[Markup.button.url('💬 Contacter le support', SUPPORT_URL)]]),
-})));
-bot.command('users', H((ctx) => {
-  const u = ctx.botInfo.username;
-  return send(ctx.chat.id, {
-    img: IMG.start,
-    text: `${L}\n✦  ${BRAND} ✦\n⚜️ By Mr Kira Tech 🌐\n${L}\n╔══════════════════════════╗\n👥 Nombre d'utilisateurs : ( <b>${Object.keys(db.users).length}</b> ) 🚹🚺\n╚══════════════════════════╝\n🔗 Bot : https://t.me/${u}`,
-    kb: kb([[Markup.button.url('📤 Partager le lien du bot', `https://t.me/share/url?url=https://t.me/${u}`)]]),
-  });
-}));
-
 // ═════════════════════════ PAIRING ═════════════════════════
-bot.command('pair', access, H(async (ctx) => {
+bot.command('pair', H(async (ctx) => {
   const raw = ctx.message.text.split(/\s+/)[1] || '';
+  if (!raw) return say(ctx, 'pair', T.pairUsage());
   const number = raw.replace(/\D/g, '');
-  if (raw.includes('+') || number.length < 8 || number.length > 15) {
-    return send(ctx.chat.id, {
-      img: IMG.start,
-      text: `⚠️❌ <b>ERREUR : NUMÉRO ERRONÉ</b> ❌⚠️\n${L}\n🚫 Le numéro que tu as tapé est invalide.\n📲 Format correct : 242XXXXXXXX\n⛔ Sans le (+) devant.\n\n🔁 Réessaie : ➜ /pair 242XXXXXXXX\n${L}\n${FOOT}`,
-    });
-  }
+  if (raw.includes('+') || number.length < 8 || number.length > 15) return say(ctx, 'pairError', T.pairError());
   const u = getUser(ctx.from.id);
-  if (!isPremium(u) && u.tries >= FREE_TRIES) return ctx.reply('🚫 Essais gratuits épuisés. Tape /premium ou /code.');
-  if (sessions.get(ctx.from.id)?.ready) return ctx.reply('ℹ️ Un WhatsApp est déjà lié. Tape /unpair d\'abord.');
-  await ctx.reply(
-    `⚠️ Avant de continuer :\n• Ce numéro doit être TON numéro.\n• Le bot pourra lire et envoyer des messages sur ce compte.\n• Tu peux tout supprimer avec /unpair.\n\nNuméro : ${number}`,
-    kb([[b("✅ J'accepte", `pair:${number}`), b('❌ Annuler', 'cancel')]])
-  );
+  if (!isPremium(u) && u.tries >= FREE_TRIES) return say(ctx, 'error', '🚫 Essais gratuits épuisés.\nTape /premium ou /code.');
+  if (sessions.get(ctx.from.id)?.ready) return say(ctx, 'error', "ℹ️ Un WhatsApp est déjà lié.\nTape /unpair d'abord.");
+  await say(ctx, 'pair', T.pairConsent(number), kb([[b("✅ J'accepte", `pair:${number}`), b('❌ Annuler', 'cancel')]]));
 }));
 bot.action(/^pair:(\d{8,15})$/, H(async (ctx) => {
   await ack(ctx);
@@ -477,40 +530,39 @@ bot.action(/^pair:(\d{8,15})$/, H(async (ctx) => {
   if (old) { try { old.sock.end(); } catch {} sessions.delete(uid); }
   fs.rmSync(path.join(SESSIONS_DIR, String(uid)), { recursive: true, force: true });
   u.tries += 1; saveDb();
-  await ctx.reply(`📡 Demande en cours pour ${number}… 🔄`);
+  ctx.deleteMessage().catch(() => {});
+  const stop = await loader(ctx.chat.id, (sym) => T.pairWait(number, sym));
   try {
     const { pairingCode } = await connectWA(uid, { number, fresh: true });
+    await stop();
     const code = pairingCode?.match(/.{1,4}/g)?.join('-') || pairingCode;
-    await send(ctx.chat.id, {
-      img: IMG.start,
-      text: `${L}\n📲 <b>PAIRING CODE</b> pour ${number} ☑️\n${L}\n╔══════════════════════════╗\n🔑 CODE DE JUMELAGE :\n╚══════════════════════════╝\n\n      ┌───────────────┐\n      │  <code>${code}</code>  │\n      └───────────────┘\n\n${L}\n👉 <b>INSTRUCTIONS :</b>\n1️⃣ Ouvre WhatsApp sur ce numéro 📱\n2️⃣ « Appareils liés » 🔗 ➜ « Lier un appareil » ➕\n3️⃣ « Lier avec un numéro de téléphone » puis entre ce code\n${L}\n✅ Une fois connecté, tape ${PREFIX}menu 📜\n${FOOT}`,
-      kb: kb([[{ text: '📄 Copier', copy_text: { text: code } }, b('⛔ Check', 'check')]]),
-    });
+    await say(ctx, 'pairCode', T.pairCode(number, code), kb([[{ text: '📄 Copier', copy_text: { text: code } }, b('⛔ Check', 'check')]]));
   } catch (e) {
     console.error(e);
+    await stop();
     sessions.delete(uid);
     fs.rmSync(path.join(SESSIONS_DIR, String(uid)), { recursive: true, force: true });
-    await ctx.reply('❌ Impossible de générer le code. Réessaie dans quelques minutes.');
+    await say(ctx, 'error', '❌ Impossible de générer le code.\nRéessaie dans quelques minutes.');
   }
 }));
-bot.action('check', (ctx) => ack(ctx, `📊 Numéros connectés au bot : ${[...sessions.values()].filter(x => x.ready).length}`, true));
-bot.command('unpair', access, H(async (ctx) => {
+bot.action('check', (ctx) => ack(ctx, `📊 Numéros connectés au bot : ${[...sessions.values()].filter((x) => x.ready).length}`, true));
+bot.command('unpair', H(async (ctx) => {
   const uid = ctx.from.id, s = sessions.get(uid);
   if (s?.sock) { try { await s.sock.logout(); } catch {} }
   sessions.delete(uid);
   fs.rmSync(path.join(SESSIONS_DIR, String(uid)), { recursive: true, force: true });
   fs.rmSync(cacheFile(uid), { force: true });
-  await ctx.reply('🔌 WhatsApp déconnecté. Session et cache supprimés ✅');
+  await ok(ctx, '🔌 WhatsApp déconnecté.\nSession et cache supprimés ✅');
 }));
 
 // ═════════════════════════ PREMIUM / CODES / SHOP ═════════════════════════
-bot.command('premium', access, H((ctx) => {
+bot.command('premium', H((ctx) => {
   const u = getUser(ctx.from.id);
   const st = isPremium(u) ? `🟢 Premium actif jusqu'au ${new Date(u.premiumUntil).toLocaleDateString('fr-FR')}` : '⚪ Pas de premium actif';
   const rows = [];
   if (!u.trialUsed) rows.push([b(`🎁 Activer ${TRIAL_DAYS / 30} mois gratuits`, 'pr:trial')]);
   rows.push([Markup.button.url('💳 Payer / Contacter', SUPPORT_URL)]);
-  return send(ctx.chat.id, { img: IMG.shop, text: `💎 <b>PREMIUM</b>\n${L}\n${st}\n\n✔️ Appairages illimités\n✔️ Support prioritaire\n\n🎁 ${TRIAL_DAYS / 30} mois offerts à la première activation.\n${FOOT}`, kb: kb(rows) });
+  return say(ctx, 'premium', T.premium(st), kb(rows));
 }));
 bot.action('pr:trial', H(async (ctx) => {
   const u = getUser(ctx.from.id);
@@ -518,97 +570,81 @@ bot.action('pr:trial', H(async (ctx) => {
   u.trialUsed = true; u.premiumUntil = Date.now() + TRIAL_DAYS * 86400000; saveDb();
   await ack(ctx, '✅ Premium activé !', true);
   ctx.deleteMessage().catch(() => {});
+  await ok(ctx, `💎 <b>Premium activé</b> ✅\nValable jusqu'au ${new Date(u.premiumUntil).toLocaleDateString('fr-FR')}`);
 }));
-bot.command('code', access, H(async (ctx) => {
+bot.command('code', H(async (ctx) => {
   const c = (ctx.message.text.split(/\s+/)[1] || '').toUpperCase();
-  if (!c) return send(ctx.chat.id, { img: IMG.shop, text: `🔐 <b>CODES PROMO</b>\n${L}\nEntre ton code :\n/code TONCODE\n${FOOT}` });
+  if (!c) return say(ctx, 'code', T.code());
   const entry = db.codes[c], u = getUser(ctx.from.id);
-  if (!entry) return ctx.reply('❌ Code invalide.');
+  if (!entry) return say(ctx, 'error', '❌ Code invalide.');
   entry.used ||= {};
-  if (entry.used[ctx.from.id]) return ctx.reply('⚠️ Code déjà utilisé.');
+  if (entry.used[ctx.from.id]) return say(ctx, 'error', '⚠️ Code déjà utilisé.');
   entry.used[ctx.from.id] = true; u.tries = Math.max(0, u.tries - entry.tries); saveDb();
-  await ctx.reply(`✅ Code validé : +${entry.tries} essai(s) gratuit(s).`);
+  await ok(ctx, `✅ <b>Code validé</b>\n+${entry.tries} essai(s) gratuit(s) ajouté(s).`);
 }));
 bot.command('addcode', H(async (ctx) => {
   if (!ADMIN_ID || ctx.from.id !== ADMIN_ID) return;
   const [, code, n] = ctx.message.text.split(/\s+/);
-  if (!code) return ctx.reply('Usage : /addcode CODE NOMBRE_ESSAIS');
+  if (!code) return ok(ctx, 'Usage : <code>/addcode CODE NOMBRE_ESSAIS</code>');
   db.codes[code.toUpperCase()] = { tries: Number(n) || 1, used: {} }; saveDb();
-  await ctx.reply(`✅ Code ${code.toUpperCase()} créé (+${Number(n) || 1} essais).`);
+  await ok(ctx, `✅ Code <b>${esc(code.toUpperCase())}</b> créé (+${Number(n) || 1} essais).`);
 }));
-bot.command('shop', access, H((ctx) => send(ctx.chat.id, {
-  img: IMG.shop, text: `🛒 <b>BOUTIQUE KIRA TECH</b>\n${L}\nOutils et services tech.\nContacte le support pour le catalogue et les prix.\n${FOOT}`,
-  kb: kb([[Markup.button.url('💬 Voir le catalogue', SUPPORT_URL)]]),
-})));
+bot.command('shop', H((ctx) => say(ctx, 'shop', T.shop(), kb([[Markup.button.url('💬 Voir le catalogue', SUPPORT_URL)]]))));
 
 // ═════════════════════════ TABLEAU DE BORD ═════════════════════════
 async function showDashboard(uid, ctx) {
   const s = sessions.get(uid);
   if (!s?.ready) return;
+  const stop = ctx ? await loader(uid, (sym) => `${sym} Chargement du tableau de bord…`) : null;
   let groups = [], gAdmin = 0;
-  try { groups = await fetchGroups(s); gAdmin = groups.filter(g => adminRole(g, s)).length; } catch {}
+  try { groups = await fetchGroups(s); gAdmin = groups.filter((g) => adminRole(g, s)).length; } catch {}
   const news = Object.keys(s.cache.news);
   let cAdmin = 0;
-  await Promise.allSettled(news.slice(0, 30).map(async j => { if (isChanAdmin(await chanMeta(s, j))) cAdmin++; }));
-  const indiv = Object.values(s.cache.chats).filter(c => !isGroup(c.jid));
-  const unsaved = indiv.filter(c => !s.cache.contacts[c.jid]?.name).length;
-  const text = `<b>BOT :</b> ${BRAND}\n<b>User :</b> +${esc(s.number)}\n<b>Statut :</b> OPEN ✅\n\n—————————————————\n<b>LISTE DES GROUPES 👥</b>\n—————————————————\nNombre : ${groups.length}\nAdmin : ${gAdmin}\n\n—————————————————\n<b>LISTE DES CHAÎNES 📊</b>\n—————————————————\nNombre : ${news.length}\nAdmin : ${cAdmin}\n\n—————————————————\n<b>CONVERSATION 💬</b>\n—————————————————\nNombre : ${Object.keys(s.cache.chats).length}\nContacts non enregistrés : ${unsaved}\n—————————————————`;
-  const o = { img: IMG.cmd, text, kb: kb([
+  await Promise.allSettled(news.slice(0, 30).map(async (j) => { if (isChanAdmin(await chanMeta(s, j))) cAdmin++; }));
+  const indiv = Object.values(s.cache.chats).filter((c) => !isGroup(c.jid));
+  const text = T.dashboard({
+    number: esc(s.number), groups: groups.length, gAdmin, news: news.length, cAdmin,
+    total: Object.keys(s.cache.chats).length, unsaved: indiv.filter((c) => !s.cache.contacts[c.jid]?.name).length,
+  });
+  const markup = kb([
     [b('👤 Modifier le profil', 'm:prof')], [b('👥 Gérer les groupes admin', 'm:grp')], [b('📊 Gérer les chaînes admin', 'm:chn')],
     [b('💬 Lire les conversations', 'm:conv')], [b('⚙️ Paramètres', 'm:set'), b('🔄 Rafraîchir', 'm:dash')],
-  ]) };
-  return ctx ? screen(ctx, o) : send(uid, o);
+  ]);
+  if (stop) await stop();
+  return ctx ? show(ctx, 'dash', text, markup) : say(uid, 'dash', text, markup);
 }
-bot.command('wa', access, H(async (ctx) => { if (await needWA(ctx)) await showDashboard(ctx.from.id, ctx); }));
-bot.action('m:dash', H(async (ctx) => { await ack(ctx, 'Actualisation…'); if (await needWA(ctx)) await showDashboard(ctx.from.id, ctx); }));
+bot.command('wa', H(async (ctx) => { if (await needWA(ctx)) await showDashboard(ctx.from.id, ctx); }));
+bot.action('m:dash', H(async (ctx) => { await ack(ctx); if (await needWA(ctx)) await showDashboard(ctx.from.id, ctx); }));
 
 // ═════════════════════════ PROFIL ═════════════════════════
 bot.action('m:prof', H(async (ctx) => {
   await ack(ctx); if (!await needWA(ctx)) return;
-  await screen(ctx, { img: IMG.cmd, text: `👤 <b>MODIFIER LE PROFIL</b>\n${L}\nQue veux-tu modifier ?`, kb: kb([
+  await show(ctx, 'profile', `👤 <b>MODIFIER LE PROFIL</b>\n${L}\nQue veux-tu modifier ?`, kb([
     [b('✏️ Nom', 'p:name'), b('🖼 Photo de profil', 'p:pic')], [b('📝 Ajouter un statut', 'p:status'), b('💬 Bio (À propos)', 'p:bio')], [b('⬅️ Retour', 'm:dash')],
-  ]) });
+  ]));
 }));
-const cancelKb = kb([[b('❌ Annuler', 'cancel')]]);
 bot.action(/^p:(\w+)(?::(\w+))?$/, H(async (ctx) => {
   await ack(ctx); if (!await needWA(ctx)) return;
   const uid = ctx.from.id, [, act, kind] = ctx.match;
-  if (act === 'name') { states.set(uid, { type: 'pname' }); return ctx.reply('✏️ Envoie le nouveau nom du profil :', cancelKb); }
-  if (act === 'pic') { states.set(uid, { type: 'ppic' }); return ctx.reply('🖼 Envoie la nouvelle photo de profil :', cancelKb); }
-  if (act === 'bio') { states.set(uid, { type: 'pbio' }); return ctx.reply('💬 Envoie ta nouvelle bio (À propos) :', cancelKb); }
+  if (act === 'name') { states.set(uid, { type: 'pname' }); return ask(ctx, '✏️ Envoie le <b>nouveau nom</b> du profil :'); }
+  if (act === 'pic') { states.set(uid, { type: 'ppic' }); return ask(ctx, '🖼 Envoie la <b>nouvelle photo</b> de profil :'); }
+  if (act === 'bio') { states.set(uid, { type: 'pbio' }); return ask(ctx, '💬 Envoie ta <b>nouvelle bio</b> (À propos) :'); }
   if (act === 'status') {
-    return screen(ctx, { text: `📝 <b>AJOUTER UN STATUT</b>\n${L}\nChoisis le type :`, kb: kb([[b('🔤 Texte', 'p:st:text'), b('🖼 Image', 'p:st:image'), b('📹 Vidéo', 'p:st:video')], [b('⬅️ Retour', 'm:prof')]]) });
+    return show(ctx, 'profile', `📝 <b>AJOUTER UN STATUT</b>\n${L}\nChoisis le type :`, kb([[b('🔤 Texte', 'p:st:text'), b('🖼 Image', 'p:st:image'), b('📹 Vidéo', 'p:st:video')], [b('⬅️ Retour', 'm:prof')]]));
   }
   if (act === 'st') {
     states.set(uid, { type: 'status', kind });
-    return ctx.reply({ text: '🔤 Envoie le texte du statut :', image: '🖼 Envoie l\'image (avec légende optionnelle) :', video: '📹 Envoie la vidéo :' }[kind], cancelKb);
+    return ask(ctx, { text: '🔤 Envoie le <b>texte</b> du statut :', image: "🖼 Envoie l'<b>image</b> du statut (légende optionnelle) :", video: '📹 Envoie la <b>vidéo</b> du statut :' }[kind]);
   }
 }));
 
 // ═════════════════════════ GROUPES ═════════════════════════
 bot.action('m:grp', H(async (ctx) => {
   await ack(ctx); if (!await needWA(ctx)) return;
-  await screen(ctx, { img: IMG.cmd, text: `👥 <b>GÉRER LES GROUPES</b>\n${L}\nChoisis une action :`, kb: kb([
+  await show(ctx, 'groups', `👥 <b>GÉRER LES GROUPES</b>\n${L}\nChoisis une action :`, kb([
     [b('📋 Liste des groupes', 'gp:list:0')], [b('➕ Ajouter un membre', 'gp:add:0')], [b('👑 Nommer un admin', 'gp:promote:0'), b('⬇️ Retirer un admin', 'gp:demote:0')],
     [b('🚪 Quitter le groupe', 'gp:leave:0')], [b('🗑 Révoker tous les admins', 'gp:revoke:0')], [b('⬅️ Retour', 'm:dash')],
-  ]) });
-}));
-const ADMIN_ACTIONS = ['promote', 'demote', 'revoke'];
-bot.action(/^gp:(\w+):(\d+)$/, H(async (ctx) => {
-  await ack(ctx); const s = await needWA(ctx); if (!s) return;
-  const [, act, pg] = ctx.match;
-  let groups = await fetchGroups(s);
-  if (ADMIN_ACTIONS.includes(act)) groups = groups.filter(g => adminRole(g, s));
-  groups.sort((a, b2) => a.subject.localeCompare(b2.subject));
-  if (!groups.length) return screen(ctx, { text: '⚠️ Aucun groupe disponible pour cette action.', kb: kb([[b('⬅️ Retour', 'm:grp')]]) });
-  const { slice, page, pages } = paginate(groups, Number(pg));
-  const lines = slice.map((g, i) => `${NUM[i]} | <b>${esc(trunc(g.subject, 30))}</b> → ${g.participants.length} membres → ${adminRole(g, s) ? 'admin' : 'non admin'}`);
-  const rows = [];
-  if (act !== 'list') for (let i = 0; i < slice.length; i += 2) rows.push(slice.slice(i, i + 2).map((g, k) => b(`${NUM[i + k]} ${trunc(g.subject, 18)}`, `g:${act}:${ref(s, g.id)}`)));
-  const nav = navRow(`gp:${act}`, page, pages); if (nav.length) rows.push(nav);
-  rows.push([b('⬅️ Retour', 'm:grp')]);
-  const title = { list: '📋 LISTE DES GROUPES', add: '➕ AJOUTER UN MEMBRE', promote: '👑 NOMMER UN ADMIN', demote: '⬇️ RETIRER UN ADMIN', leave: '🚪 QUITTER UN GROUPE', revoke: '🗑 RÉVOQUER LES ADMINS' }[act];
-  await screen(ctx, { img: IMG.cmd, text: `<b>${title}</b>\nUser : +${esc(s.number)}\n${L}\n${lines.join('\n')}\n${L}\nPage ${page + 1}/${pages}${act === 'list' ? '' : '\n👇 Choisis un groupe :'}`, kb: kb(rows) });
+  ]));
 }));
 function paginate(items, page) {
   const pages = Math.max(1, Math.ceil(items.length / PAGE));
@@ -621,18 +657,35 @@ const navRow = (prefix, page, pages) => {
   if (page < pages - 1) r.push(b('➡️ Suivant', `${prefix}:${page + 1}`));
   return r;
 };
+const ADMIN_ACTIONS = ['promote', 'demote', 'revoke'];
+bot.action(/^gp:(\w+):(\d+)$/, H(async (ctx) => {
+  await ack(ctx); const s = await needWA(ctx); if (!s) return;
+  const [, act, pg] = ctx.match;
+  let groups = await fetchGroups(s);
+  if (ADMIN_ACTIONS.includes(act)) groups = groups.filter((g) => adminRole(g, s));
+  groups.sort((x, y) => x.subject.localeCompare(y.subject));
+  if (!groups.length) return show(ctx, 'groups', '⚠️ Aucun groupe disponible pour cette action.', kb([[b('⬅️ Retour', 'm:grp')]]));
+  const { slice, page, pages } = paginate(groups, Number(pg));
+  const lines = slice.map((g, i) => `${NUM[i]} | <b>${esc(trunc(g.subject, 30))}</b> → ${g.participants.length} → (${adminRole(g, s) ? 'admin' : 'non admin'})`);
+  const rows = [];
+  if (act !== 'list') for (let i = 0; i < slice.length; i += 2) rows.push(slice.slice(i, i + 2).map((g, k) => b(`${NUM[i + k]} ${trunc(g.subject, 18)}`, `g:${act}:${ref(s, g.id)}`)));
+  const nav = navRow(`gp:${act}`, page, pages); if (nav.length) rows.push(nav);
+  rows.push([b('⬅️ Retour', 'm:grp')]);
+  const title = { list: '📋 LISTE DES GROUPES', add: '➕ AJOUTER UN MEMBRE', promote: '👑 NOMMER UN ADMIN', demote: '⬇️ RETIRER UN ADMIN', leave: '🚪 QUITTER UN GROUPE', revoke: '🗑 RÉVOQUER LES ADMINS' }[act];
+  await show(ctx, 'groups', `<b>${title}</b>\nUser : +${esc(s.number)}\n${L}\n${lines.join('\n')}\n${L}\nPage ${page + 1}/${pages}${act === 'list' ? '' : '\n👇 Choisis un groupe :'}`, kb(rows));
+}));
 bot.action(/^g:(\w+):(\w+)$/, H(async (ctx) => {
   await ack(ctx); const s = await needWA(ctx); if (!s) return;
   const [, act, id] = ctx.match, gid = jidOf(s, id), uid = ctx.from.id;
-  if (!gid) return ctx.reply('⌛ Liste expirée, relance /wa.');
+  if (!gid) return say(ctx, 'error', '⌛ Liste expirée.\nRelance /wa.');
   const name = await groupName(s, gid);
   if (act === 'add' || act === 'promote' || act === 'demote') {
     states.set(uid, { type: 'gnum', act, gid });
-    const hint = act === 'add' ? '📲 Envoie le numéro à ajouter (format international)\nEx : +242 06 123 45 67' : '📲 Envoie le numéro du membre (format international)';
-    return ctx.reply(`Groupe : ${name}\n${hint}`, cancelKb);
+    const hint = act === 'add' ? '📲 Envoie le <b>numéro à ajouter</b> (format international)\nEx : +242 06 123 45 67' : '📲 Envoie le <b>numéro du membre</b> (format international)';
+    return ask(ctx, `👥 Groupe : <b>${esc(name)}</b>\n${hint}`);
   }
   if (act === 'leave') {
-    return screen(ctx, { text: `🚪 <b>Quitter « ${esc(name)} » ?</b>`, kb: kb([[b('🗑 Quitter', `g:leaveok:${id}`), b('❌ Quitter + Supprimer', `g:leavedel:${id}`)], [b('⬅️ Retour', 'm:grp')]]) });
+    return show(ctx, 'groups', `🚪 <b>Quitter « ${esc(name)} » ?</b>`, kb([[b('🗑 Quitter', `g:leaveok:${id}`), b('❌ Quitter + Supprimer', `g:leavedel:${id}`)], [b('⬅️ Retour', 'm:grp')]]));
   }
   if (act === 'leaveok' || act === 'leavedel') {
     await s.sock.groupLeave(gid);
@@ -641,102 +694,101 @@ bot.action(/^g:(\w+):(\w+)$/, H(async (ctx) => {
       if (last) await s.sock.chatModify({ delete: true, lastMessages: [{ key: last.key, messageTimestamp: last.ts }] }, gid).catch(() => {});
       delete s.cache.chats[gid]; delete s.cache.msgs[gid];
     }
-    return screen(ctx, { text: `✅ Tu as quitté « ${esc(name)} »${act === 'leavedel' ? ' et la conversation a été supprimée' : ''}.`, kb: kb([[b('⬅️ Retour', 'm:grp')]]) });
+    return show(ctx, 'groups', `✅ Tu as quitté « ${esc(name)} »${act === 'leavedel' ? ' et la conversation a été supprimée' : ''}.`, kb([[b('⬅️ Retour', 'm:grp')]]));
   }
   if (act === 'revoke') {
-    return screen(ctx, { text: `🗑 <b>Retirer tous les admins de « ${esc(name)} » ?</b>\nLe créateur et ton propre compte ne sont jamais retirés.`, kb: kb([[b('🗑 Retirer tous les admins', `g:revokeok:${id}`)], [b('⬅️ Retour', 'm:grp')]]) });
+    return show(ctx, 'groups', `🗑 <b>Retirer tous les admins de « ${esc(name)} » ?</b>\nLe créateur et ton propre compte ne sont jamais retirés.`, kb([[b('🗑 Retirer tous les admins', `g:revokeok:${id}`)], [b('⬅️ Retour', 'm:grp')]]));
   }
   if (act === 'revokeok') {
-    const g = await s.sock.groupMetadata(gid), me = selfIds(s);
-    const targets = g.participants.filter(p => p.admin === 'admin' && !me.includes(userPart(p.id)) && !me.includes(userPart(p.lid)) && !me.includes(userPart(p.phoneNumber))).map(p => p.id);
+    const g = await s.sock.groupMetadata(gid);
+    const targets = g.participants.filter((p) => p.admin === 'admin' && !isMe(s, p)).map((p) => p.id);
     for (let i = 0; i < targets.length; i += 20) await s.sock.groupParticipantsUpdate(gid, targets.slice(i, i + 20), 'demote');
-    return screen(ctx, { text: `Félicitations 🎊\nCommande : réussie ✅\nAdmins retirés : 🗑\nNombre 📊 : ${targets.length}`, kb: kb([[b('⬅️ Retour', 'm:grp')]]) });
+    return show(ctx, 'groups', T.revoked(targets.length), kb([[b('⬅️ Retour', 'm:grp')]]));
   }
 }));
 async function groupNumberAction(ctx, s, st) {
   const jid = await resolveNumber(s, ctx.message.text);
-  if (!jid) return ctx.reply('❌ Numéro invalide ou absent de WhatsApp. Réessaie (format international) ou ❌ Annuler.', cancelKb);
+  if (!jid) return ask(ctx, '❌ Numéro invalide ou absent de WhatsApp.\nRéessaie (format international) ou clique ❌ Annuler.');
   states.delete(ctx.from.id);
-  const name = await groupName(s, st.gid);
-  const upd = { add: 'add', promote: 'promote', demote: 'demote' }[st.act];
-  const res = await s.sock.groupParticipantsUpdate(st.gid, [jid], upd);
+  const name = esc(await groupName(s, st.gid));
+  const res = await s.sock.groupParticipantsUpdate(st.gid, [jid], st.act);
   const status = String(res?.[0]?.status || '');
   let msg;
-  if (status === '200') msg = { add: '✅ Membre ajouté', promote: '👑 Nommé admin', demote: '⬇️ Admin retiré' }[upd] + ` : ${numOf(jid)} → ${name}`;
+  if (status === '200') msg = { add: '✅ Membre ajouté', promote: '👑 Nommé admin', demote: '⬇️ Admin retiré' }[st.act] + ` : ${esc(numOf(jid))} → ${name}`;
   else if (status === '409') msg = 'ℹ️ Cette personne est déjà dans le groupe.';
-  else if (status === '403' && upd === 'add') {
+  else if (status === '403' && st.act === 'add') {
     const code = await s.sock.groupInviteCode(st.gid);
-    await s.sock.sendMessage(jid, { text: `Tu es invité(e) à rejoindre « ${name} » : https://chat.whatsapp.com/${code}` });
-    msg = '🔗 Ajout direct impossible (confidentialité) : lien d\'invitation envoyé en privé.';
+    await s.sock.sendMessage(jid, { text: `Tu es invité(e) à rejoindre « ${await groupName(s, st.gid)} » : https://chat.whatsapp.com/${code}` });
+    msg = "🔗 Ajout direct impossible (confidentialité) : lien d'invitation envoyé en privé.";
   } else if (status === '408') msg = '⚠️ Impossible : la personne a quitté récemment le groupe.';
-  else msg = `⚠️ Échec (code ${status || 'inconnu'}). Vérifie que tu es admin du groupe.`;
-  await ctx.reply(msg, kb([[b('⬅️ Retour', 'm:grp')]]));
+  else msg = `⚠️ Échec (code ${esc(status || 'inconnu')}).\nVérifie que tu es admin du groupe.`;
+  await say(ctx, 'groups', msg, kb([[b('⬅️ Retour', 'm:grp')]]));
 }
 
 // ═════════════════════════ CHAÎNES ═════════════════════════
 bot.action(/^m:chn$|^np:(\d+)$/, H(async (ctx) => {
   await ack(ctx); const s = await needWA(ctx); if (!s) return;
   const jids = Object.keys(s.cache.news);
-  const metas = await Promise.all(jids.map(async j => { try { return await chanMeta(s, j); } catch { return null; } }));
+  const metas = await Promise.all(jids.map(async (j) => { try { return await chanMeta(s, j); } catch { return null; } }));
   const items = jids.map((j, i) => ({ jid: j, name: metas[i]?.name || s.cache.news[j]?.name || 'Chaîne', subs: metas[i]?.subscribers, role: chanRole(metas[i]) }));
   const { slice, page, pages } = paginate(items, Number(ctx.match[1] || 0));
-  const lines = slice.map((c, i) => `${NUM[i]} <b>${esc(trunc(c.name, 28))}</b> — ${c.subs ?? '?'} abonnés — ${c.role === 'OWNER' ? 'propriétaire' : c.role === 'ADMIN' ? 'admin' : c.role ? 'abonné' : '?'}`);
+  const lines = slice.map((c, i) => `${NUM[i]} <b>${esc(trunc(c.name, 28))}</b> — (${c.subs ?? '?'} abonnés) — ${c.role === 'OWNER' ? 'propriétaire' : c.role === 'ADMIN' ? 'admin' : c.role ? 'abonné' : '?'}`);
   const rows = [];
   for (let i = 0; i < slice.length; i += 2) rows.push(slice.slice(i, i + 2).map((c, k) => b(`${NUM[i + k]} ${trunc(c.name, 18)}`, `n:open:${ref(s, c.jid)}`)));
   const nav = navRow('np', page, pages); if (nav.length) rows.push(nav);
   rows.push([b('➕ Ajouter une chaîne (lien)', 'n:add:0')], [b('⬅️ Retour', 'm:dash')]);
-  await screen(ctx, { img: IMG.cmd, text: `📊 <b>LISTE DES CHAÎNES</b>\n${L}\n${lines.join('\n') || 'Aucune chaîne détectée pour le moment.\nUtilise ➕ pour ajouter une chaîne avec son lien.'}\n${L}\nPage ${page + 1}/${pages}`, kb: kb(rows) });
+  await show(ctx, 'channels', `📊 <b>LISTE DES CHAÎNES</b>\n${L}\n${lines.join('\n') || 'Aucune chaîne détectée pour le moment.\nUtilise ➕ pour ajouter une chaîne avec son lien.'}\n${L}\nPage ${page + 1}/${pages}`, kb(rows));
 }));
 bot.action(/^n:(\w+):(\w+)$/, H(async (ctx) => {
   await ack(ctx); const s = await needWA(ctx); if (!s) return;
   const uid = ctx.from.id, [, act, id] = ctx.match;
-  if (act === 'add') { states.set(uid, { type: 'chadd' }); return ctx.reply('🔗 Envoie le lien de ta chaîne (https://whatsapp.com/channel/…) :', cancelKb); }
+  if (act === 'add') { states.set(uid, { type: 'chadd' }); return ask(ctx, '🔗 Envoie le <b>lien de ta chaîne</b> (https://whatsapp.com/channel/…) :'); }
   const jid = jidOf(s, id);
-  if (!jid) return ctx.reply('⌛ Liste expirée, rouvre le menu des chaînes.');
+  if (!jid) return say(ctx, 'error', '⌛ Liste expirée.\nRouvre le menu des chaînes.');
   const meta = await chanMeta(s, jid).catch(() => null);
   const name = meta?.name || s.cache.news[jid]?.name || 'Chaîne';
   const back = [b('⬅️ Retour', `n:open:${id}`)];
   switch (act) {
     case 'open':
-      return screen(ctx, { img: IMG.cmd, text: `📢 <b>CHAÎNE : ${esc(name)}</b>\n${L}\n👥 Abonnés : ${meta?.subscribers ?? '?'}\n🔰 Rôle : ${chanRole(meta) || 'inconnu'}\n${L}`, kb: kb([
+      return show(ctx, 'channels', `📢 <b>CHAÎNE : ${esc(name)}</b>\n${L}\n👥 Abonnés : ${meta?.subscribers ?? '?'}\n🔰 Rôle : ${chanRole(meta) || 'inconnu'}\n${L}`, kb([
         [b('👤 Modifier le profil', `n:prof:${id}`)], [b('👑 Nommer admin', `n:admin:${id}`), b('🔱 Nommer propriétaire', `n:owner:${id}`)],
         [b('🗑 Retirer un admin', `n:demote:${id}`), b('📜 Voir messages', `n:msgs:${id}`)], [b('🚪 Quitter la chaîne', `n:leave:${id}`)], [b('⬅️ Retour', 'm:chn')],
-      ]) });
+      ]));
     case 'prof':
-            return screen(ctx, { text: `👤 <b>PROFIL DE LA CHAÎNE</b>\n${esc(name)}`, kb: kb([[b('✏️ Nom', `n:name:${id}`), b('🖼 Photo', `n:pic:${id}`)], [b('💬 Envoyer un message', `n:msg:${id}`)], back]) });
-    case 'name': states.set(uid, { type: 'chname', jid }); return ctx.reply('✏️ Envoie le nouveau nom de la chaîne :', cancelKb);
-    case 'pic': states.set(uid, { type: 'chpic', jid }); return ctx.reply('🖼 Envoie la nouvelle photo de la chaîne :', cancelKb);
-    case 'msg': states.set(uid, { type: 'chmsg', jid }); return ctx.reply('💬 Envoie le message (texte, image ou vidéo) à publier dans la chaîne :', cancelKb);
-    case 'admin': states.set(uid, { type: 'chnum', act: 'admin', jid }); return ctx.reply('👑 Envoie le numéro à nommer admin :', cancelKb);
-    case 'owner': states.set(uid, { type: 'chnum', act: 'owner', jid }); return ctx.reply('🔱 Envoie le numéro du futur propriétaire (⚠️ tu perds la propriété) :', cancelKb);
-    case 'demote': states.set(uid, { type: 'chnum', act: 'demote', jid }); return ctx.reply('🗑 Envoie le numéro de l\'admin à retirer :', cancelKb);
+      return show(ctx, 'channels', `👤 <b>PROFIL DE LA CHAÎNE</b>\n${esc(name)}`, kb([[b('✏️ Nom', `n:name:${id}`), b('🖼 Photo', `n:pic:${id}`)], [b('💬 Envoyer un message', `n:msg:${id}`)], back]));
+    case 'name': states.set(uid, { type: 'chname', jid }); return ask(ctx, '✏️ Envoie le <b>nouveau nom</b> de la chaîne :');
+    case 'pic': states.set(uid, { type: 'chpic', jid }); return ask(ctx, '🖼 Envoie la <b>nouvelle photo</b> de la chaîne :');
+    case 'msg': states.set(uid, { type: 'chmsg', jid }); return ask(ctx, '💬 Envoie le <b>message</b> (texte, image ou vidéo) à publier dans la chaîne :');
+    case 'admin': states.set(uid, { type: 'chnum', act: 'admin', jid }); return ask(ctx, '👑 Envoie le <b>numéro à nommer admin</b> :');
+    case 'owner': states.set(uid, { type: 'chnum', act: 'owner', jid }); return ask(ctx, '🔱 Envoie le <b>numéro du futur propriétaire</b>\n⚠️ Tu perds la propriété de la chaîne.');
+    case 'demote': states.set(uid, { type: 'chnum', act: 'demote', jid }); return ask(ctx, "🗑 Envoie le <b>numéro de l'admin à retirer</b> :");
     case 'msgs': {
       const arr = (s.cache.msgs[jid] || []).slice(-10);
-      const t = arr.length ? arr.map(e => `[${fmtTime(e.ts)}] ${esc(trunc(e.text, 150))}`).join('\n\n') : 'Aucun message en cache pour cette chaîne.';
-      return screen(ctx, { text: `📜 <b>${esc(name)}</b>\n${L}\n${t}`, kb: kb([back]) });
+      const t = arr.length ? arr.map((e) => `[${fmtTime(e.ts)}] ${esc(trunc(e.text, 150))}`).join('\n\n') : 'Aucun message en cache pour cette chaîne.';
+      return show(ctx, 'channels', `📜 <b>${esc(name)}</b>\n${L}\n${t}`, kb([back]));
     }
     case 'leave':
-      return screen(ctx, { text: `🚪 <b>Quitter « ${esc(name)} » ?</b>`, kb: kb([[b('🗑 Quitter', `n:leaveok:${id}`), b('❌ Quitter + Supprimer', `n:leavedel:${id}`)], back]) });
+      return show(ctx, 'channels', `🚪 <b>Quitter « ${esc(name)} » ?</b>`, kb([[b('🗑 Quitter', `n:leaveok:${id}`), b('❌ Quitter + Supprimer', `n:leavedel:${id}`)], back]));
     case 'leaveok': case 'leavedel': {
       if (act === 'leavedel') await s.sock.newsletterDelete(jid); else await s.sock.newsletterUnfollow(jid);
-      delete s.cache.news[jid]; const u = getUser(uid); u.channels = u.channels.filter(j => j !== jid); saveDb();
-      return screen(ctx, { text: act === 'leavedel' ? '✅ Chaîne supprimée.' : '✅ Tu as quitté la chaîne.', kb: kb([[b('⬅️ Retour', 'm:chn')]]) });
+      delete s.cache.news[jid]; const u = getUser(uid); u.channels = u.channels.filter((j) => j !== jid); saveDb();
+      return show(ctx, 'channels', act === 'leavedel' ? '✅ Chaîne supprimée.' : '✅ Tu as quitté la chaîne.', kb([[b('⬅️ Retour', 'm:chn')]]));
     }
   }
 }));
 async function channelNumberAction(ctx, s, st) {
   const jid = await resolveNumber(s, ctx.message.text);
-  if (!jid) return ctx.reply('❌ Numéro invalide ou absent de WhatsApp. Réessaie ou ❌ Annuler.', cancelKb);
+  if (!jid) return ask(ctx, '❌ Numéro invalide ou absent de WhatsApp.\nRéessaie ou clique ❌ Annuler.');
   states.delete(ctx.from.id);
   const sock = s.sock;
   if (st.act === 'admin') {
     const fn = sock.newsletterAdminInvite || sock.newsletterPromote;
-    if (typeof fn !== 'function') return ctx.reply('⚠️ Cette version de Baileys ne permet pas encore d\'inviter un admin de chaîne. Fais-le depuis WhatsApp.');
+    if (typeof fn !== 'function') return say(ctx, 'channels', "⚠️ Cette version de Baileys ne permet pas encore d'inviter un admin de chaîne.\nFais-le depuis WhatsApp.");
     await fn.call(sock, st.jid, jid);
-    return ctx.reply(`👑 Invitation admin envoyée à ${numOf(jid)} ✅`);
+    return ok(ctx, `👑 Invitation admin envoyée à ${esc(numOf(jid))} ✅`);
   }
-  if (st.act === 'owner') { await sock.newsletterChangeOwner(st.jid, jid); return ctx.reply(`🔱 Propriété transférée à ${numOf(jid)} ✅`); }
-  if (st.act === 'demote') { await sock.newsletterDemote(st.jid, jid); return ctx.reply(`🗑 ${numOf(jid)} n'est plus admin ✅`); }
+  if (st.act === 'owner') { await sock.newsletterChangeOwner(st.jid, jid); return ok(ctx, `🔱 Propriété transférée à ${esc(numOf(jid))} ✅`); }
+  if (st.act === 'demote') { await sock.newsletterDemote(st.jid, jid); return ok(ctx, `🗑 ${esc(numOf(jid))} n'est plus admin ✅`); }
 }
 
 // ═════════════════════════ CONVERSATIONS ═════════════════════════
@@ -744,23 +796,23 @@ const TITLES = { inbox: '📥 BOÎTE DE RÉCEPTION', unread: '🔵 NON LUS', fav
 function chatItems(s, kind) {
   const chats = Object.values(s.cache.chats);
   const toItem = (c) => ({ jid: c.jid, name: nameOf(s, c.jid), ts: c.ts, text: c.text, unread: c.unread, icon: isGroup(c.jid) ? '👥' : '👤', pin: c.pin || c.fav });
-  const byTs = (a, b2) => (b2.ts || 0) - (a.ts || 0);
+  const byTs = (x, y) => (y.ts || 0) - (x.ts || 0);
+  const byName = (x, y) => x.name.localeCompare(y.name);
   switch (kind) {
-    case 'inbox': return chats.filter(c => !c.archived).map(toItem).sort(byTs);
-    case 'unread': return chats.filter(c => c.unread > 0 && !c.archived).map(toItem).sort(byTs);
-    case 'favs': return chats.filter(c => c.pin || c.fav).map(toItem).sort(byTs);
-    case 'archives': return chats.filter(c => c.archived).map(toItem).sort(byTs);
-    case 'groups': return chats.filter(c => isGroup(c.jid)).map(toItem).sort((a, b2) => a.name.localeCompare(b2.name));
-    case 'contacts': return Object.entries(s.cache.contacts).filter(([j]) => j.endsWith('@s.whatsapp.net')).map(([j, c]) => ({ jid: j, name: c.name, icon: '👤' })).sort((a, b2) => a.name.localeCompare(b2.name));
-    case 'sent': return Object.entries(s.cache.msgs).flatMap(([j, arr]) => arr.filter(e => e.fromMe).slice(-5).map(e => ({ jid: j, name: nameOf(s, j), ts: e.ts, text: e.text, icon: isGroup(j) ? '👥' : '👤' }))).sort(byTs).slice(0, 40);
+    case 'inbox': return chats.filter((c) => !c.archived).map(toItem).sort(byTs);
+    case 'unread': return chats.filter((c) => c.unread > 0 && !c.archived).map(toItem).sort(byTs);
+    case 'favs': return chats.filter((c) => c.pin || c.fav).map(toItem).sort(byTs);
+    case 'archives': return chats.filter((c) => c.archived).map(toItem).sort(byTs);
+    case 'groups': return chats.filter((c) => isGroup(c.jid)).map(toItem).sort(byName);
+    case 'contacts': return Object.entries(s.cache.contacts).filter(([j]) => j.endsWith('@s.whatsapp.net')).map(([j, c]) => ({ jid: j, name: c.name, icon: '👤' })).sort(byName);
+    case 'sent': return Object.entries(s.cache.msgs).flatMap(([j, arr]) => arr.filter((e) => e.fromMe).slice(-5).map((e) => ({ jid: j, name: nameOf(s, j), ts: e.ts, text: e.text, icon: isGroup(j) ? '👥' : '👤' }))).sort(byTs).slice(0, 40);
     case 'search': return s.search;
   }
   return [];
 }
 async function showList(ctx, s, kind, pg) {
   if (kind === 'groups') await fetchGroups(s).catch(() => {});
-  const items = chatItems(s, kind);
-  const { slice, page, pages } = paginate(items, pg);
+  const { slice, page, pages } = paginate(chatItems(s, kind), pg);
   const lines = slice.map((it, i) => `${NUM[i]} ${it.icon} <b>${esc(trunc(it.name, 26))}</b>${it.ts ? ' — ' + fmtTime(it.ts) : ''}${it.text ? `\n    « ${esc(trunc(it.text, 40))} » ${it.unread > 0 ? '🔵' : '⚪'}${it.pin ? ' ⭐' : ''}` : ''}`);
   const rows = [];
   for (let i = 0; i < slice.length; i += 4) rows.push(slice.slice(i, i + 4).map((it, k) => b(NUM[i + k], `c:open:${ref(s, it.jid)}`)));
@@ -768,133 +820,127 @@ async function showList(ctx, s, kind, pg) {
   rows.push([b('🔄 Rafraîchir', `l:${kind}:${page}`), ...(kind === 'inbox' || kind === 'unread' ? [b('🔍 Filtrer', 'm:filter')] : [])]);
   rows.push([b('⬅️ Retour', 'm:conv')]);
   const legend = kind === 'inbox' ? '\nLégende : 🔵 non lu | ⚪ lu | ⭐ épinglé' : '';
-  await screen(ctx, { img: IMG.cmd, text: `${L}\n<b>${TITLES[kind]}</b>\n${L}\n${lines.join('\n') || 'Rien à afficher.'}\n${L}\nPage ${page + 1}/${pages}${legend}`, kb: kb(rows) });
+  await show(ctx, 'inbox', `${L}\n<b>${TITLES[kind]}</b>\n${L}\n${lines.join('\n') || 'Rien à afficher.'}\n${L}\nPage ${page + 1}/${pages}${legend}`, kb(rows));
 }
-bot.command('conversations', access, H(async (ctx) => { if (await needWA(ctx)) await convMenu(ctx, sessions.get(ctx.from.id)); }));
 async function convMenu(ctx, s) {
   const chats = Object.values(s.cache.chats);
-  await screen(ctx, { img: IMG.cmd, text: `${L}\n💬 <b>GESTION DES CONVERSATIONS</b>\n${L}\n<b>BOT :</b> ${BRAND}\n<b>User :</b> +${esc(s.number)}\n<b>Statut :</b> OPEN ✅\n${L}\n📊 Total conversations : ${chats.length}\n💬 Non lues : ${chats.filter(c => c.unread > 0).length}\n👤 Contacts : ${Object.keys(s.cache.contacts).length}\n👥 Groupes : ${chats.filter(c => isGroup(c.jid)).length}\n📢 Chaînes : ${Object.keys(s.cache.news).length}\n${L}`, kb: kb([
+  await show(ctx, 'convs', T.convMenu({
+    number: esc(s.number), total: chats.length, unread: chats.filter((c) => c.unread > 0).length, contacts: Object.keys(s.cache.contacts).length,
+    groups: chats.filter((c) => isGroup(c.jid)).length, news: Object.keys(s.cache.news).length,
+  }), kb([
     [b('📥 Boîte de réception', 'l:inbox:0'), b('📤 Messages envoyés', 'l:sent:0')], [b('👤 Contacts', 'l:contacts:0'), b('👥 Groupes', 'l:groups:0')],
     [b('📢 Chaînes', 'm:chn'), b('🔍 Rechercher', 'm:search')], [b('⭐ Favoris', 'l:favs:0'), b('🗑 Archives', 'l:archives:0')], [b('⬅️ Retour', 'm:dash')],
-  ]) });
+  ]));
 }
+bot.command('conversations', H(async (ctx) => { if (await needWA(ctx)) await convMenu(ctx, sessions.get(ctx.from.id)); }));
 bot.action('m:conv', H(async (ctx) => { await ack(ctx); const s = await needWA(ctx); if (s) await convMenu(ctx, s); }));
 bot.action(/^l:(\w+):(\d+)$/, H(async (ctx) => { await ack(ctx); const s = await needWA(ctx); if (s) await showList(ctx, s, ctx.match[1], Number(ctx.match[2])); }));
 bot.action('m:filter', H(async (ctx) => {
   await ack(ctx);
-  await screen(ctx, { text: '🔍 <b>Filtrer la boîte de réception</b>', kb: kb([[b('🔵 Non lus', 'l:unread:0'), b('🕒 Récents', 'l:inbox:0'), b('⭐ Importants', 'l:favs:0')], [b('⬅️ Retour', 'm:conv')]]) });
+  await show(ctx, 'inbox', '🔍 <b>Filtrer la boîte de réception</b>', kb([[b('🔵 Non lus', 'l:unread:0'), b('🕒 Récents', 'l:inbox:0'), b('⭐ Importants', 'l:favs:0')], [b('⬅️ Retour', 'm:conv')]]));
 }));
 bot.action('m:search', H(async (ctx) => {
   await ack(ctx); if (!await needWA(ctx)) return;
   states.set(ctx.from.id, { type: 'search' });
-  await ctx.reply(`${L}\n🔍 RECHERCHE\n${L}\nTape un :\n➜ Nom du contact\n➜ Numéro de téléphone\n➜ Mot-clé dans les messages`, cancelKb);
+  await ask(ctx, T.search());
 }));
 function runSearch(s, q) {
   q = q.toLowerCase();
+  const digits = q.replace(/\D/g, '');
   const out = [];
-  const jids = new Set([...Object.keys(s.cache.chats), ...Object.keys(s.cache.contacts)]);
-  for (const j of jids) {
+  for (const j of new Set([...Object.keys(s.cache.chats), ...Object.keys(s.cache.contacts)])) {
     if (!j.endsWith('@s.whatsapp.net') && !isGroup(j)) continue;
-    const nameHit = nameOf(s, j).toLowerCase().includes(q) || userPart(j).includes(q.replace(/\D/g, '') || '§');
-    const hits = (s.cache.msgs[j] || []).filter(e => e.text.toLowerCase().includes(q)).length;
+    const nameHit = nameOf(s, j).toLowerCase().includes(q) || (digits.length > 3 && userPart(j).includes(digits));
+    const hits = (s.cache.msgs[j] || []).filter((e) => e.text.toLowerCase().includes(q)).length;
     if (nameHit || hits) out.push({ jid: j, name: nameOf(s, j), icon: isGroup(j) ? '👥' : '👤', text: hits ? `${hits} résultat(s)` : '', ts: s.cache.chats[j]?.ts });
   }
-  return out.sort((a, b2) => (b2.ts || 0) - (a.ts || 0));
+  return out.sort((x, y) => (y.ts || 0) - (x.ts || 0));
 }
-
 async function convText(s, jid, limit = 12) {
-  const arr = (s.cache.msgs[jid] || []).slice().sort((a, b2) => a.ts - b2.ts).slice(-limit);
+  const arr = (s.cache.msgs[jid] || []).slice().sort((x, y) => x.ts - y.ts).slice(-limit);
   const c = s.cache.chats[jid] || {};
   let head;
   if (isGroup(jid)) {
     let g = s.gmeta[jid]; if (!g) { try { g = s.gmeta[jid] = await s.sock.groupMetadata(jid); } catch {} }
-    head = `👥 <b>GROUPE : ${esc(nameOf(s, jid))}</b>\n${L}\n👤 Membres : ${g?.participants?.length ?? '?'}\n👑 Admins : ${g ? g.participants.filter(p => p.admin).length : '?'}\n📅 Dernier message : ${fmtTime(c.ts)}`;
+    head = `👥 <b>GROUPE : ${esc(nameOf(s, jid))}</b>\n${L}\n👤 Membres : ${g?.participants?.length ?? '?'}\n👑 Admins : ${g ? g.participants.filter((p) => p.admin).length : '?'}\n📅 Dernier message : ${fmtTime(c.ts)}`;
   } else {
     head = `💬 <b>CONVERSATION</b>\n${L}\n👤 Contact : ${esc(nameOf(s, jid))}\n📞 Numéro  : ${esc(numOf(jid))}\n📅 Dernier message : ${fmtTime(c.ts)}`;
   }
-  const body = arr.length ? arr.map(e => `[${fmtTime(e.ts)}] ${e.fromMe ? '🤖 Moi' : '👤 ' + esc(trunc(e.who, 20))} :\n${esc(trunc(e.text, 160))}`).join('\n\n') : 'Aucun message en cache pour cette conversation (les nouveaux messages apparaîtront ici).';
+  const body = arr.length ? arr.map((e) => `[${fmtTime(e.ts)}] ${e.fromMe ? '🤖 Moi' : '👤 ' + esc(trunc(e.who, 20))} :\n${esc(trunc(e.text, 160))}`).join('\n\n') : 'Aucun message en cache pour cette conversation (les nouveaux messages apparaîtront ici).';
   return `${head}\n${L}\n📜 <b>HISTORIQUE (${arr.length} derniers messages)</b>\n─────────────────────────\n${body}\n─────────────────────────`;
 }
 async function openConv(ctx, s, jid) {
   s.cur = jid;
   const id = ref(s, jid), c = (s.cache.chats[jid] ||= { jid, unread: 0, ts: 0 });
   if (getUser(s.uid).settings.read) {
-    const keys = (s.cache.msgs[jid] || []).filter(e => !e.fromMe).slice(-10).map(e => e.key);
+    const keys = (s.cache.msgs[jid] || []).filter((e) => !e.fromMe).slice(-10).map((e) => e.key);
     if (keys.length) s.sock.readMessages(keys).catch(() => {});
     c.unread = 0;
   }
-  const grp = isGroup(jid);
+  const grp = isGroup(jid), fav = c.pin || c.fav, mute = c.muted || c.mutedLocal;
   const rows = [
-    [b('✍️ Répondre', `c:reply:${id}`), b('🖼 Image', `c:img:${id}`)], [b('🎤 Vocal', `c:voc:${id}`), b('📎 Document', `c:doc:${id}`)],
-    [b('📹 Vidéo', `c:vid:${id}`), b('📍 Localisation', `c:loc:${id}`)], [b('😀 Emojis', `c:emo:${id}`), b('⚡ Réponses rapides', `c:quick:${id}`)],
+    [b('✍️ Répondre', `c:reply:${id}`), b('🖼 Envoyer image', `c:img:${id}`)], [b('🎤 Envoyer vocal', `c:voc:${id}`), b('📎 Envoyer document', `c:doc:${id}`)],
+    [b('📹 Envoyer vidéo', `c:vid:${id}`), b('📍 Envoyer localisation', `c:loc:${id}`)], [b('😀 Emojis', `c:emo:${id}`), b('⚡ Réponses rapides', `c:quick:${id}`)],
     [b('📜 Historique', `c:hist:${id}:0:all`), b('🔄 Rafraîchir', `c:open:${id}`)],
-    [b(c.pin || c.fav ? '⭐ Retirer favori' : '⭐ Épingler', `c:${c.pin || c.fav ? 'unpin' : 'pin'}:${id}`), b(c.muted || c.mutedLocal ? '🔊 Unmute' : '🔕 Mute', `c:${c.muted || c.mutedLocal ? 'unmute' : 'mute'}:${id}`)],
+    [b(fav ? '⭐ Retirer favori' : '⭐ Épingler', `c:${fav ? 'unpin' : 'pin'}:${id}`), b(mute ? '🔊 Unmute' : '🔕 Mute', `c:${mute ? 'unmute' : 'mute'}:${id}`)],
     [b(c.archived ? '📤 Désarchiver' : '📥 Archiver', `c:${c.archived ? 'unarch' : 'arch'}:${id}`), b('👁 Marquer lu', `c:read:${id}`)],
     [b('🗑 Supprimer', `c:del:${id}`), grp ? b('🚪 Quitter', `g:leave:${id}`) : b(c.blocked ? '✅ Débloquer' : '🚫 Bloquer', `c:${c.blocked ? 'unblock' : 'block'}:${id}`)],
     [b('👤 Infos', `c:info:${id}`), ...(grp ? [b('👥 Membres', `c:members:${id}`), b('👑 Admins', `c:admins:${id}`)] : [])],
     [b('⬅️ Retour', 'l:inbox:0')],
   ];
-  await screen(ctx, { text: await convText(s, jid), kb: kb(rows) });
+  await show(ctx, 'conv', await convText(s, jid), kb(rows));
 }
-function lastKeys(s, jid) { const l = s.cache.msgs[jid]?.at(-1); return l ? [{ key: l.key, messageTimestamp: l.ts }] : []; }
+const lastKeys = (s, jid) => { const l = s.cache.msgs[jid]?.at(-1); return l ? [{ key: l.key, messageTimestamp: l.ts }] : []; };
 const PROMPT = (n) => ({
-  text: `✍️ Envoie ton message à ${n} :`, image: '📸 Envoie la photo à envoyer :', voice: '🎤 Envoie le vocal :',
-  video: '📹 Envoie la vidéo :', document: '📎 Envoie le document :', location: '📍 Envoie ta localisation (trombone ➜ Position) :',
+  text: `✍️ Envoie ton <b>message</b> à ${n} :`, image: '📸 Envoie la <b>photo</b> à envoyer :', voice: '🎤 Envoie le <b>vocal</b> :',
+  video: '📹 Envoie la <b>vidéo</b> :', document: '📎 Envoie le <b>document</b> :', location: '📍 Envoie ta <b>localisation</b> (trombone ➜ Position) :',
 });
 async function sendAndConfirm(ctx, s, jid, content) {
   const sent = await s.sock.sendMessage(jid, content);
   s.last = { jid, key: sent?.key, text: content.text };
   const id = ref(s, jid);
-  await send(ctx.chat.id, {
-    text: `✅ <b>Message envoyé</b> à ${esc(nameOf(s, jid))}\n📅 ${fmtDate()}`,
-    kb: kb([[...(content.text ? [b('🔄 Renvoyer', `c:resend:${id}`)] : []), b('↩️ Annuler', `c:undo:${id}`)], [b('⬅️ Retour', `c:open:${id}`)]]),
-  });
+  await say(ctx, 'ok', T.sent(esc(nameOf(s, jid))), kb([[...(content.text ? [b('🔄 Renvoyer', `c:resend:${id}`)] : []), b('↩️ Annuler', `c:undo:${id}`)], [b('⬅️ Retour', `c:open:${id}`)]]));
 }
 bot.action(/^c:(\w+):(\w+)(?::(.+))?$/, H(async (ctx) => {
   const s = await needWA(ctx); if (!s) return;
   const [, act, id, extra] = ctx.match, uid = ctx.from.id;
   const jid = jidOf(s, id);
-  if (!jid) { await ack(ctx); return ctx.reply('⌛ Conversation introuvable (redémarrage ?). Rouvre-la via /conversations.'); }
-  const c = (s.cache.chats[jid] ||= { jid, unread: 0, ts: 0 });
-  const name = nameOf(s, jid);
   await ack(ctx);
+  if (!jid) return say(ctx, 'error', '⌛ Conversation introuvable (redémarrage ?).\nRouvre-la via /conversations.');
+  const c = (s.cache.chats[jid] ||= { jid, unread: 0, ts: 0 });
+  const name = nameOf(s, jid), P = PROMPT(esc(name));
   switch (act) {
-    case 'open': return openConv(ctx, s, jid);
-    case 'reply': states.set(uid, { type: 'send', kind: 'text', jid }); return ctx.reply(PROMPT(name).text, cancelKb);
-    case 'img': states.set(uid, { type: 'send', kind: 'image', jid }); return ctx.reply(PROMPT(name).image, cancelKb);
-    case 'voc': states.set(uid, { type: 'send', kind: 'voice', jid }); return ctx.reply(PROMPT(name).voice, cancelKb);
-    case 'vid': states.set(uid, { type: 'send', kind: 'video', jid }); return ctx.reply(PROMPT(name).video, cancelKb);
-    case 'doc': states.set(uid, { type: 'send', kind: 'document', jid }); return ctx.reply(PROMPT(name).document, cancelKb);
-    case 'loc': states.set(uid, { type: 'send', kind: 'location', jid }); return ctx.reply(PROMPT(name).location, cancelKb);
-    case 'emo': return screen(ctx, { text: '😀 <b>Choisis un emoji à envoyer</b>', kb: kb([EMOJIS.slice(0, 4).map((e, i) => b(e, `c:e:${id}:${i}`)), EMOJIS.slice(4).map((e, i) => b(e, `c:e:${id}:${i + 4}`)), [b('⬅️ Retour', `c:open:${id}`)]]) });
+    case 'open': case 'refresh': return openConv(ctx, s, jid);
+    case 'reply': states.set(uid, { type: 'send', kind: 'text', jid }); return ask(ctx, P.text);
+    case 'img': states.set(uid, { type: 'send', kind: 'image', jid }); return ask(ctx, P.image);
+    case 'voc': states.set(uid, { type: 'send', kind: 'voice', jid }); return ask(ctx, P.voice);
+    case 'vid': states.set(uid, { type: 'send', kind: 'video', jid }); return ask(ctx, P.video);
+    case 'doc': states.set(uid, { type: 'send', kind: 'document', jid }); return ask(ctx, P.document);
+    case 'loc': states.set(uid, { type: 'send', kind: 'location', jid }); return ask(ctx, P.location);
+    case 'emo': return show(ctx, 'conv', '😀 <b>Choisis un emoji à envoyer</b>', kb([EMOJIS.slice(0, 4).map((e, i) => b(e, `c:e:${id}:${i}`)), EMOJIS.slice(4).map((e, i) => b(e, `c:e:${id}:${i + 4}`)), [b('⬅️ Retour', `c:open:${id}`)]]));
     case 'e': return sendAndConfirm(ctx, s, jid, { text: EMOJIS[Number(extra)] });
     case 'quick': {
-      const tpl = getUser(uid).templates;
-      const rows = [...QUICK.map(([e, t], i) => [b(`${e} ${trunc(t, 34)}`, `c:q:${id}:${i}`)]), ...tpl.map((t, i) => [b(`📝 ${trunc(t, 34)}`, `c:q:${id}:${QUICK.length + i}`)]), [b('➕ Créer un modèle', `c:tpl:${id}`)], [b('⬅️ Retour', `c:open:${id}`)]];
-      return screen(ctx, { text: `⚡ <b>RÉPONSES RAPIDES</b> → ${esc(name)}`, kb: kb(rows) });
+      const rows = [...QUICK.map(([e, t], i) => [b(`${e} ${trunc(t, 34)}`, `c:q:${id}:${i}`)]), ...getUser(uid).templates.map((t, i) => [b(`📝 ${trunc(t, 34)}`, `c:q:${id}:${QUICK.length + i}`)]), [b('➕ Créer un modèle', `c:tpl:${id}`)], [b('⬅️ Retour', `c:open:${id}`)]];
+      return show(ctx, 'conv', `⚡ <b>RÉPONSES RAPIDES</b> → ${esc(name)}`, kb(rows));
     }
     case 'q': {
       const i = Number(extra), t = i < QUICK.length ? QUICK[i][1] : getUser(uid).templates[i - QUICK.length];
-      if (!t) return;
-      return sendAndConfirm(ctx, s, jid, { text: t });
+      return t ? sendAndConfirm(ctx, s, jid, { text: t }) : undefined;
     }
-    case 'tpl': states.set(uid, { type: 'tpl' }); return ctx.reply('📝 Envoie le texte du nouveau modèle de réponse :', cancelKb);
-    case 'resend': if (s.last?.text) return sendAndConfirm(ctx, s, s.last.jid, { text: s.last.text }); return;
+    case 'tpl': states.set(uid, { type: 'tpl' }); return ask(ctx, '📝 Envoie le <b>texte du nouveau modèle</b> de réponse :');
+    case 'resend': return s.last?.text ? sendAndConfirm(ctx, s, s.last.jid, { text: s.last.text }) : undefined;
     case 'undo':
-      if (s.last?.key) { await s.sock.sendMessage(s.last.jid, { delete: s.last.key }); return ctx.reply('↩️ Message supprimé pour tout le monde ✅'); }
+      if (s.last?.key) { await s.sock.sendMessage(s.last.jid, { delete: s.last.key }); return ok(ctx, '↩️ Message supprimé pour tout le monde ✅'); }
       return;
-    case 'hist': {
-      const [pg = '0', filter = 'all'] = String(extra || '0:all').split(':');
-      return showHistory(ctx, s, jid, id, Number(pg), filter);
-    }
-    case 'refresh': return openConv(ctx, s, jid);
+    case 'hist': { const [pg = '0', filter = 'all'] = String(extra || '0:all').split(':'); return showHistory(ctx, s, jid, id, Number(pg), filter); }
+    case 'hdate': states.set(uid, { type: 'hdate', jid }); return ask(ctx, '📅 Envoie la <b>date</b> au format JJ/MM/AAAA :');
     case 'read': {
-      const keys = (s.cache.msgs[jid] || []).filter(e => !e.fromMe).slice(-10).map(e => e.key);
-      if (keys.length) await s.sock.readMessages(keys); c.unread = 0;
-      return ack(ctx, '👁 Marqué comme lu', true);
+      const keys = (s.cache.msgs[jid] || []).filter((e) => !e.fromMe).slice(-10).map((e) => e.key);
+      if (keys.length) await s.sock.readMessages(keys);
+      c.unread = 0; return ack(ctx, '👁 Marqué comme lu', true);
     }
     case 'pin': case 'unpin':
-      c.fav = act === 'pin'; await s.sock.chatModify({ pin: act === 'pin' }, jid).catch(() => {}); c.pin = c.fav;
+      c.fav = act === 'pin'; c.pin = c.fav; await s.sock.chatModify({ pin: act === 'pin' }, jid).catch(() => {});
       return openConv(ctx, s, jid);
     case 'mute': case 'unmute':
       c.mutedLocal = act === 'mute'; c.muted = act === 'mute';
@@ -906,69 +952,68 @@ bot.action(/^c:(\w+):(\w+)(?::(.+))?$/, H(async (ctx) => {
     case 'block': case 'unblock':
       await s.sock.updateBlockStatus(jid, act); c.blocked = act === 'block'; return openConv(ctx, s, jid);
     case 'del':
-      return screen(ctx, { text: `🗑 <b>Supprimer la conversation avec ${esc(name)} ?</b>`, kb: kb([[b('🗑 Oui, supprimer', `c:delok:${id}`), b('⬅️ Non', `c:open:${id}`)]]) });
+      return show(ctx, 'conv', `🗑 <b>Supprimer la conversation avec ${esc(name)} ?</b>`, kb([[b('🗑 Oui, supprimer', `c:delok:${id}`), b('⬅️ Non', `c:open:${id}`)]]));
     case 'delok':
       await s.sock.chatModify({ delete: true, lastMessages: lastKeys(s, jid) }, jid).catch(() => {});
       delete s.cache.chats[jid]; delete s.cache.msgs[jid];
-      return screen(ctx, { text: '🗑 Conversation supprimée ✅', kb: kb([[b('⬅️ Retour', 'l:inbox:0')]]) });
+      return show(ctx, 'ok', '🗑 Conversation supprimée ✅', kb([[b('⬅️ Retour', 'l:inbox:0')]]));
     case 'info': {
       const pic = await s.sock.profilePictureUrl(jid, 'image').catch(() => null);
       let text;
       if (isGroup(jid)) {
         const g = await s.sock.groupMetadata(jid);
-        text = `👥 <b>${esc(g.subject)}</b>\n${L}\n👤 Membres : ${g.participants.length}\n👑 Admins : ${g.participants.filter(p => p.admin).length}\n📅 Créé : ${new Date(g.creation * 1000).toLocaleDateString('fr-FR')}\n📝 ${esc(trunc(g.desc || '—', 200))}`;
+        text = `👥 <b>${esc(g.subject)}</b>\n${L}\n👤 Membres : ${g.participants.length}\n👑 Admins : ${g.participants.filter((p) => p.admin).length}\n📅 Créé : ${new Date(g.creation * 1000).toLocaleDateString('fr-FR')}\n📝 ${esc(trunc(g.desc || '—', 200))}`;
       } else {
         const st = await s.sock.fetchStatus(jid).catch(() => null);
         const bio = st?.[0]?.status?.status ?? st?.status?.status ?? '—';
         text = `${L}\n👤 <b>INFORMATIONS CONTACT</b>\n${L}\n📛 Nom    : ${esc(name)}\n📞 Numéro : ${esc(numOf(jid))}\n📝 Bio    : « ${esc(trunc(bio, 150))} »\n🔒 Type   : ${s.cache.contacts[jid]?.name ? 'Contact enregistré' : 'Non enregistré'}\n${L}\n📅 Dernière interaction : ${fmtTime(c.ts)}\n💬 Messages en cache : ${(s.cache.msgs[jid] || []).length}`;
       }
-      return send(ctx.chat.id, { img: pic, text, kb: kb([[b('⬅️ Retour', `c:open:${id}`)]]) });
+      return send(ctx.chat.id, { img: pic || IMG.conv, text, kb: kb([[b('⬅️ Retour', `c:open:${id}`)]]) });
     }
     case 'members': case 'admins': {
       const g = await s.sock.groupMetadata(jid);
-      const list = g.participants.filter(p => act === 'members' || p.admin).map(p => `${p.admin ? '👑' : '👤'} ${esc(nameOf(s, p.id))} (${esc(numOf(p.phoneNumber || p.id))})`);
-      return screen(ctx, { text: `${act === 'members' ? '👥 MEMBRES' : '👑 ADMINS'} — ${esc(g.subject)}\n${L}\n${list.slice(0, 40).join('\n')}${list.length > 40 ? `\n… +${list.length - 40}` : ''}`, kb: kb([[b('⬅️ Retour', `c:open:${id}`)]]) });
+      const list = g.participants.filter((p) => act === 'members' || p.admin).map((p) => `${p.admin ? '👑' : '👤'} ${esc(nameOf(s, p.id))} (${esc(numOf(p.phoneNumber || p.id))})`);
+      return show(ctx, 'conv', `${act === 'members' ? '👥 MEMBRES' : '👑 ADMINS'} — ${esc(g.subject)}\n${L}\n${list.slice(0, 40).join('\n')}${list.length > 40 ? `\n… +${list.length - 40}` : ''}`, kb([[b('⬅️ Retour', `c:open:${id}`)]]));
     }
   }
 }));
 async function showHistory(ctx, s, jid, id, pg, filter) {
   const kinds = { media: ['image', 'video', 'sticker'], voice: ['audio'], docs: ['document'], links: ['link'] };
-  let arr = (s.cache.msgs[jid] || []).slice().sort((a, b2) => b2.ts - a.ts);
-  if (kinds[filter]) arr = arr.filter(e => kinds[filter].includes(e.kind));
-  if (filter.startsWith('d')) arr = arr.filter(e => { const d = new Date(e.ts * 1000); return `d${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}` === filter; });
+  let arr = (s.cache.msgs[jid] || []).slice().sort((x, y) => y.ts - x.ts);
+  if (kinds[filter]) arr = arr.filter((e) => kinds[filter].includes(e.kind));
+  if (filter.startsWith('d')) arr = arr.filter((e) => { const d = new Date(e.ts * 1000); return `d${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}` === filter; });
   const per = 12, pages = Math.max(1, Math.ceil(arr.length / per)), page = Math.min(pg, pages - 1);
   const slice = arr.slice(page * per, (page + 1) * per).reverse();
   const range = arr.length ? `${new Date(arr.at(-1).ts * 1000).toLocaleDateString('fr-FR')} → ${new Date(arr[0].ts * 1000).toLocaleDateString('fr-FR')}` : '—';
-  const body = slice.map(e => `[${fmtTime(e.ts)}] ${e.fromMe ? '🤖 Moi' : '👤 ' + esc(trunc(e.who, 20))} : ${esc(trunc(e.text, 140))}`).join('\n\n') || 'Aucun message.';
+  const body = slice.map((e) => `[${fmtTime(e.ts)}] ${e.fromMe ? '🤖 Moi' : '👤 ' + esc(trunc(e.who, 20))} : ${esc(trunc(e.text, 140))}`).join('\n\n') || 'Aucun message.';
   const nav = [];
   if (page < pages - 1) nav.push(b('⬅️ Plus anciens', `c:hist:${id}:${page + 1}:${filter}`));
   if (page > 0) nav.push(b('➡️ Plus récents', `c:hist:${id}:${page - 1}:${filter}`));
-  await screen(ctx, { text: `${L}\n📜 <b>HISTORIQUE — ${esc(nameOf(s, jid))}</b>\n${L}\nTotal messages : ${arr.length}\n📅 Période : ${range}\n${L}\n${body}`, kb: kb([
+  await show(ctx, 'history', `${L}\n📜 <b>HISTORIQUE — ${esc(nameOf(s, jid))}</b>\n${L}\nTotal messages : [ ${arr.length} ]\n📅 Période : ${range}\n${L}\n${body}`, kb([
     ...(nav.length ? [nav] : []),
     [b('🖼 Médias', `c:hist:${id}:0:media`), b('🎤 Vocaux', `c:hist:${id}:0:voice`)], [b('📎 Documents', `c:hist:${id}:0:docs`), b('🔗 Liens', `c:hist:${id}:0:links`)],
     [b('📅 Filtrer par date', `c:hdate:${id}`), b('🔄 Tout', `c:hist:${id}:0:all`)], [b('⬅️ Retour', `c:open:${id}`)],
-  ]) });
+  ]));
 }
-bot.action(/^c:hdate:(\w+)$/, H(async (ctx) => { await ack(ctx); const s = await needWA(ctx); if (!s) return; states.set(ctx.from.id, { type: 'hdate', jid: jidOf(s, ctx.match[1]) }); await ctx.reply('📅 Envoie la date au format JJ/MM/AAAA :', cancelKb); }));
 
 // ═════════════════════════ PARAMETRES ═════════════════════════
 async function settingsScreen(ctx) {
   const st = getUser(ctx.from.id).settings;
   const nl = { all: '🔔 Toutes les conversations', none: '🔕 Aucune', groups: '✅ Groupes uniquement', contacts: '✅ Contacts uniquement' }[st.notif];
-  await screen(ctx, { img: IMG.cmd, text: `${L}\n⚙️ <b>PARAMÈTRES</b>\n${L}\n🔔 Notifications : ${nl}\n👁 Aperçu messages : ${st.preview ? '✅ Affiché' : '❌ Masqué'}\n✔️ Accusés de lecture auto : ${st.read ? '✅ Activés' : '❌ Désactivés (mode fantôme)'}\n💾 Sauvegarde du cache sur le serveur : ${st.save ? '✅ Activée' : '❌ Désactivée'}\n🌐 Langue : Français`, kb: kb([
+  await show(ctx, 'settings', `${L}\n⚙️ <b>PARAMÈTRES</b>\n${L}\n🔔 Notifications : ${nl}\n👁 Aperçu messages : ${st.preview ? '✅ Affiché' : '❌ Masqué'}\n✔️ Accusés de lecture auto : ${st.read ? '✅ Activés' : '❌ Désactivés (mode fantôme)'}\n💾 Sauvegarde du cache sur le serveur : ${st.save ? '✅ Activée' : '❌ Désactivée'}\n🌐 Langue : Français`, kb([
     [b('🔔 Notifications', 's:notif'), b('👁 Aperçu ON/OFF', 's:prev')], [b('✔️ Accusés de lecture', 's:read'), b('💾 Sauvegarde', 's:save')],
-    [b('🗑 Vider l\'historique', 's:clear')], [b('⬅️ Retour', 'm:dash')],
-  ]) });
+    [b("🗑 Vider l'historique", 's:clear')], [b('⬅️ Retour', 'm:dash')],
+  ]));
 }
 bot.action('m:set', H(async (ctx) => { await ack(ctx); await settingsScreen(ctx); }));
 bot.action(/^s:(\w+)$/, H(async (ctx) => {
-  const uid = ctx.from.id, u = getUser(uid), st = u.settings, act = ctx.match[1], s = sessions.get(uid);
+  const uid = ctx.from.id, st = getUser(uid).settings, act = ctx.match[1], s = sessions.get(uid);
   await ack(ctx);
   if (act === 'notif') { const order = ['all', 'groups', 'contacts', 'none']; st.notif = order[(order.indexOf(st.notif) + 1) % 4]; }
   if (act === 'prev') st.preview = !st.preview;
   if (act === 'read') st.read = !st.read;
   if (act === 'save') { st.save = !st.save; if (!st.save) fs.rmSync(cacheFile(uid), { force: true }); else if (s) scheduleSave(s); }
-  if (act === 'clear' && s) { s.cache.chats = {}; s.cache.msgs = {}; s.cache.contacts = {}; fs.rmSync(cacheFile(uid), { force: true }); await ctx.reply('🗑 Historique en cache vidé ✅'); }
+  if (act === 'clear' && s) { s.cache.chats = {}; s.cache.msgs = {}; s.cache.contacts = {}; fs.rmSync(cacheFile(uid), { force: true }); await ok(ctx, '🗑 Historique en cache vidé ✅'); }
   saveDb();
   await settingsScreen(ctx);
 }));
@@ -997,52 +1042,53 @@ bot.on(['text', 'photo', 'video', 'video_note', 'voice', 'audio', 'document', 'l
   const uid = ctx.from.id, st = states.get(uid);
   if (!st) return;
   const s = sessions.get(uid);
-  if (!s?.ready) { states.delete(uid); return ctx.reply('⚠️ WhatsApp non connecté. Tape /pair'); }
+  if (!s?.ready) { states.delete(uid); return say(ctx, 'error', '⚠️ WhatsApp non connecté.\nTape /pair'); }
   const m = ctx.message, sock = s.sock;
-  const wrong = () => ctx.reply('⚠️ Type de message incorrect. Réessaie ou clique ❌ Annuler.', cancelKb);
+  const wrong = () => say(ctx, 'error', '⚠️ Type de message incorrect.\nRéessaie ou clique ❌ Annuler.', cancelKb);
   switch (st.type) {
     case 'send': {
       const content = await buildContent(m, st.kind); if (!content) return wrong();
       states.delete(uid); return sendAndConfirm(ctx, s, st.jid, content);
     }
-    case 'pname': if (!m.text) return wrong(); await sock.updateProfileName(m.text.slice(0, 25)); states.delete(uid); return ctx.reply('✅ Nom du profil modifié.');
-    case 'pbio': if (!m.text) return wrong(); await sock.updateProfileStatus(m.text.slice(0, 139)); states.delete(uid); return ctx.reply('✅ Bio modifiée.');
+    case 'pname': if (!m.text) return wrong(); await sock.updateProfileName(m.text.slice(0, 25)); states.delete(uid); return ok(ctx, '✅ Nom du profil modifié.');
+    case 'pbio': if (!m.text) return wrong(); await sock.updateProfileStatus(m.text.slice(0, 139)); states.delete(uid); return ok(ctx, '✅ Bio modifiée.');
     case 'ppic': {
       const c = await buildContent(m, 'image'); if (!c) return wrong();
-      await sock.updateProfilePicture(selfJid(s), c.image); states.delete(uid); return ctx.reply('✅ Photo de profil modifiée.');
+      await sock.updateProfilePicture(selfJid(s), c.image); states.delete(uid); return ok(ctx, '✅ Photo de profil modifiée.');
     }
     case 'status': {
       const c = await buildContent(m, st.kind); if (!c) return wrong();
-      const list = [...new Set([selfJid(s), ...Object.keys(s.cache.contacts).filter(j => j.endsWith('@s.whatsapp.net'))])];
+      const list = [...new Set([selfJid(s), ...Object.keys(s.cache.contacts).filter((j) => j.endsWith('@s.whatsapp.net'))])];
       await sock.sendMessage('status@broadcast', c, { backgroundColor: '#1a1a2e', font: 2, statusJidList: list });
-      states.delete(uid); return ctx.reply(`✅ Statut publié (visible par ${list.length} contact(s) connus du bot).`);
+      states.delete(uid); return ok(ctx, `✅ Statut publié (visible par ${list.length} contact(s) connus du bot).`);
     }
     case 'gnum': if (!m.text) return wrong(); return groupNumberAction(ctx, s, st);
     case 'chnum': if (!m.text) return wrong(); return channelNumberAction(ctx, s, st);
-    case 'chname': if (!m.text) return wrong(); await sock.newsletterUpdateName(st.jid, m.text); states.delete(uid); return ctx.reply('✅ Nom de la chaîne modifié.');
+    case 'chname': if (!m.text) return wrong(); await sock.newsletterUpdateName(st.jid, m.text); states.delete(uid); return ok(ctx, '✅ Nom de la chaîne modifié.');
     case 'chpic': {
       const c = await buildContent(m, 'image'); if (!c) return wrong();
-      await sock.newsletterUpdatePicture(st.jid, c.image); states.delete(uid); return ctx.reply('✅ Photo de la chaîne modifiée.');
+      await sock.newsletterUpdatePicture(st.jid, c.image); states.delete(uid); return ok(ctx, '✅ Photo de la chaîne modifiée.');
     }
     case 'chmsg': {
       const c = (await buildContent(m, 'text')) || (await buildContent(m, 'image')) || (await buildContent(m, 'video')); if (!c) return wrong();
-      await sock.sendMessage(st.jid, c); states.delete(uid); return ctx.reply('✅ Message publié dans la chaîne.');
+      await sock.sendMessage(st.jid, c); states.delete(uid); return ok(ctx, '✅ Message publié dans la chaîne.');
     }
     case 'chadd': {
-      const code = m.text?.match(/channel\/([\w-]+)/)?.[1]; if (!code) return ctx.reply('⚠️ Lien invalide. Exemple : https://whatsapp.com/channel/XXXX', cancelKb);
+      const code = m.text?.match(/channel\/([\w-]+)/)?.[1];
+      if (!code) return say(ctx, 'error', '⚠️ Lien invalide.\nExemple : https://whatsapp.com/channel/XXXX', cancelKb);
       const meta = await sock.newsletterMetadata('invite', code);
       addNews(s, meta.id, meta.name); s.chanMeta[meta.id] = { m: meta, t: Date.now() }; states.delete(uid);
-      return ctx.reply(`✅ Chaîne ajoutée : ${meta.name}\nRôle détecté : ${chanRole(meta) || 'inconnu'}`, kb([[b('📊 Mes chaînes', 'm:chn')]]));
+      return ok(ctx, `✅ Chaîne ajoutée : <b>${esc(meta.name)}</b>\nRôle détecté : ${esc(chanRole(meta) || 'inconnu')}`, kb([[b('📊 Mes chaînes', 'm:chn')]]));
     }
     case 'search': {
       if (!m.text) return wrong(); states.delete(uid);
       s.search = runSearch(s, m.text.trim());
-      await ctx.reply(`🔍 ${s.search.length} résultat(s) pour « ${m.text.trim()} »`);
       return showList(ctx, s, 'search', 0);
     }
-    case 'tpl': if (!m.text) return wrong(); getUser(uid).templates.push(m.text.slice(0, 200)); saveDb(); states.delete(uid); return ctx.reply('✅ Modèle enregistré (⚡ Réponses rapides).');
+    case 'tpl': if (!m.text) return wrong(); getUser(uid).templates.push(m.text.slice(0, 200)); saveDb(); states.delete(uid); return ok(ctx, '✅ Modèle enregistré (⚡ Réponses rapides).');
     case 'hdate': {
-      const r = m.text?.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); if (!r) return ctx.reply('⚠️ Format attendu : JJ/MM/AAAA', cancelKb);
+      const r = m.text?.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (!r) return say(ctx, 'error', '⚠️ Format attendu : JJ/MM/AAAA', cancelKb);
       states.delete(uid);
       return showHistory(ctx, s, st.jid, ref(s, st.jid), 0, `d${r[3]}${p2(r[2])}${p2(r[1])}`);
     }
@@ -1053,17 +1099,19 @@ bot.catch((err) => console.error('Erreur bot:', err));
 
 // ═════════════════════════ DEMARRAGE ═════════════════════════
 for (const id of fs.readdirSync(SESSIONS_DIR)) if (/^\d+$/.test(id)) connectWA(Number(id)).catch(console.error);
+http.createServer((_, res) => res.end('Shadow Kira Bot OK')).listen(process.env.PORT || 3000);
 
-bot.launch().then(async () => {
+// Telegraf 4 : launch() ne se termine qu'à l'arrêt du bot, d'où le callback de démarrage.
+bot.launch({ dropPendingUpdates: true }, async () => {
   console.log('Shadow Kira Bot en ligne ✅');
   await bot.telegram.setMyCommands([
     { command: 'start', description: 'Démarrer le bot' }, { command: 'menu', description: 'Afficher le menu' }, { command: 'help', description: 'Aide' },
-    { command: 'pair', description: 'Appairage WhatsApp' }, { command: 'unpair', description: 'Déconnecter WhatsApp' }, { command: 'wa', description: 'Tableau de bord WhatsApp' },
-    { command: 'conversations', description: 'Gérer les conversations' }, { command: 'link', description: 'Obtenir les liens' }, { command: 'contact', description: 'Nous contacter' },
+    { command: 'pair', description: 'Lancer un appairage WhatsApp' }, { command: 'unpair', description: 'Déconnecter WhatsApp' }, { command: 'wa', description: 'Tableau de bord WhatsApp' },
+    { command: 'conversations', description: 'Gérer les conversations' }, { command: 'link', description: 'Obtenir le lien' }, { command: 'contact', description: 'Nous contacter' },
     { command: 'users', description: "Nombre d'utilisateurs" }, { command: 'code', description: 'Codes promo' }, { command: 'premium', description: 'Premium' }, { command: 'shop', description: 'Boutique' },
   ]).catch(() => {});
-});
-http.createServer((_, res) => res.end('Shadow Kira Bot OK')).listen(process.env.PORT || 3000);
+}).catch((e) => { console.error('Lancement impossible :', e.message); process.exit(1); });
+
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
-  
+      
