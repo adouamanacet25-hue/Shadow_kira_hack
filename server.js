@@ -14,8 +14,21 @@ import makeWASocket, {
 const BRAND = '☠︎︎༒︎ 𝕊ℍ𝔸𝔻𝕆𝕎 𝕂𝕀ℝ𝔸 𝔹𝕆𝕋 ༒︎☠︎︎';
 const AUTHOR = '⫸𝐌𝐫 𝐊𝐈𝐑𝐀┃𝗧𝗘𝗖𝗛 🌐⫷';
 const PREFIX = '.';
-const FREE_TRIES = 5;
+const FREE_TRIES = 3;
 const TRIAL_DAYS = 90;
+const STAR_PRICE = 5; // prix en ⭐️ Telegram Stars pour le premium
+const SHOP = [
+  { id: 'banp', name: 'Support ban Puissant 🔱', price: 1000 },
+  { id: 'banb', name: 'Ban Bot tech 🚫', price: 3000 },
+  { id: 'fbot', name: 'Fichier bot 🗂', price: 1500 },
+  { id: 'fbug', name: 'Fichier bug bot 🗂', price: 2500 },
+  { id: 'fban', name: 'Fichier ban bot 🗂', price: 3000 },
+  { id: 'fsite', name: 'Fichier site 📰', price: 1500 },
+  { id: 'tgpr', name: 'Telegram premium ⭐️', price: 3500 },
+  { id: 'check', name: 'Check ban personnalisable 📌', price: 0 },
+  { id: 'learn', name: 'Apprendre création bot', price: 3500 },
+];
+const SUPPORT_HUB = 'https://t.me/KIRA_SUPPORT_HUB';
 
 const LINKS = {
   tgChannel: 'https://t.me/+mQ3aQpCsEqI0YmY0',
@@ -37,7 +50,10 @@ const IMG = {
   start: A, menu: A, help: A, users: A,
   pair: A, pairError: A, pairCode: A, connected: A,
   link: B, contact: B,
-  code: C, premium: C, shop: C,
+  code: 'https://i.ibb.co/gb1dDWkH/CA3-C96-E9-D196-47-E1-A233-109-B01-C89-D8-F.jpg',
+  premium: 'https://i.ibb.co/PZ9xxdg8/8-A9-B2-F88-3997-4-D16-983-F-D2-A0-D83-D453-B.jpg',
+  premiumPaid: 'https://i.ibb.co/PZ9xxdg8/8-A9-B2-F88-3997-4-D16-983-F-D2-A0-D83-D453-B.jpg',
+  shop: 'https://i.ibb.co/SDcQpnCw/55-C2-B254-0209-44-D0-96-F2-BA06-F7-C7-AC48.jpg',
   dash: D, profile: D, groups: D, channels: D, convs: D, conv: D, inbox: D, history: D, settings: D, notif: D,
   ok: A, error: A, ask: D,
   // ── WhatsApp ──
@@ -127,9 +143,21 @@ const revoked = (n) => `Félicitations 🎊\nCommande : réussie ✅\nAdmins ret
 
 // ───────────── Premium / codes / shop ─────────────
 const premium = (status) =>
-  `💎 <b>PREMIUM</b>\n${L}\n${status}\n\n✔️ Appairages illimités\n✔️ Support prioritaire\n\n🎁 ${TRIAL_DAYS / 30} mois offerts à la première activation.\n${FOOT}`;
-const code = () => `🔐 <b>CODES PROMO</b>\n${L}\nEntre ton code :\n<code>/code TONCODE</code>\n${FOOT}`;
-const shop = () => `🛒 <b>BOUTIQUE KIRA TECH</b>\n${L}\nOutils et services tech.\nContacte le support pour le catalogue et les prix.\n${FOOT}`;
+  `💎 <b>PREMIUM BOT</b> 🌐\n${L}\n${status}\n\n` +
+  `✅ ${TRIAL_DAYS / 30} mois gratuits\n📲 Paiement via : [ ⭐️ Stars ]\n📲 Paiement par achat directement au support : [ 📩 Support ]\n${L}`;
+const premiumDenied = () =>
+  `🚫 <b>ACCÈS REFUSÉ</b> ❌\n${L}\nTes essais gratuits sont épuisés.\n💎 Paye premium pour continuer.\n${L}`;
+const premiumPaid = (price, username) =>
+  `🎊 <b>ACHAT EFFECTUÉ</b> ✅\n${L}\n🏷 Prix ➜ ${price}⭐️\n💎 Bot ➜ 🟢\n👤 User ➜ ${username}\n${L}\n` +
+  `NB : accès illimité de ${TRIAL_DAYS / 30} mois au bot 🤖 merci 🤩\n\n<blockquote>Merci beaucoup 😊</blockquote>`;
+const code = () => `🔐 <b>CODES PROMO</b>\n${L}\nEntre ton code :\n<code>/code TONCODE</code>\n\nExemple : <code>/code KIRA25</code>\n${FOOT}`;
+const codeOk = (n) => `✅ <b>Code validé</b>\n+${n} essai(s) gratuit(s) ajouté(s).`;
+const codeBad = () => '❌ Code invalide ou déjà utilisé.';
+const shopHeader = (lines) =>
+  `🛒 <b>BOUTIQUE KIRA TECH</b> 🌐\n─────────────────\n${lines}\n─────────────────\n👇 Clique sur un achat`;
+const shopItem = (name, price) =>
+  `🛍 <b>${name}</b>\n${L}\n🏷 Prix : ${price === 0 ? 'Gratuit' : price + ' f'}\n${L}\nChoisis une option :`;
+const shopDemand = (user, name, price) => `.shop achat demander de ${user} de ${name} prix 🏷 ${price === 0 ? 'Gratuit' : price + ' f'}`;
 
 // ───────────── WhatsApp (texte WhatsApp, pas HTML) ─────────────
 const waConnected = (date = dateBox()) =>
@@ -139,7 +167,7 @@ const waMenu = () =>
   `▉ *KIRA TECH SHADOW B0T* 🌹▉\n\n╔══════════════════════════╗\n   📜 *MENU WHATSAPP*\n╚══════════════════════════╝\n\n` +
   `${PREFIX}menu ➜ Afficher ce menu\n${PREFIX}ping ➜ Vitesse du bot\n${PREFIX}tagall ➜ Mentionner tout le groupe\n${PREFIX}hidetag texte ➜ Mention cachée\n${PREFIX}link ➜ Lien d'invitation du groupe\n${PREFIX}infos ➜ Infos du groupe\n\n` +
   `➠ Auteur : Mr Kira Tech 🌐\n➠ Prefix : [ ${PREFIX} ]\n> power by Mr Kira tech 🌐`;
-  return { dateBox, dateShort, L, FOOT, start, menu, help, link, contact, users, pairUsage, pairError, pairConsent, pairWait, pairCode, connected, controlBox, dashboard, convMenu, search, sent, incoming, revoked, premium, code, shop, waConnected, waMenu };
+  return { dateBox, dateShort, L, FOOT, start, menu, help, link, contact, users, pairUsage, pairError, pairConsent, pairWait, pairCode, connected, controlBox, dashboard, convMenu, search, sent, incoming, revoked, premium, premiumDenied, premiumPaid, code, codeOk, codeBad, shopHeader, shopItem, shopDemand, waConnected, waMenu };
 })();
 
 const { L, FOOT } = T;
@@ -160,6 +188,7 @@ const PAGE = 8;
 // ═════════════════════════ BASE DE DONNEES ═════════════════════════
 let db = { users: {}, codes: {} };
 try { db = { ...db, ...JSON.parse(fs.readFileSync(DB_FILE, 'utf8')) }; } catch {}
+db.codes.KIRA25 ||= { tries: 3, used: {} }; // code promo permanent
 const saveDb = () => fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
 const DEFAULT_SETTINGS = { notif: 'all', preview: true, read: false, save: false };
 function getUser(id) {
@@ -184,6 +213,21 @@ const fmtTime = (ts) => {
 const userPart = (jid) => String(jid || '').split('@')[0].split(':')[0];
 const numOf = (jid) => '+' + userPart(jid);
 const isGroup = (jid) => String(jid).endsWith('@g.us');
+const isLid = (jid) => String(jid).endsWith('@lid');
+// WhatsApp masque parfois le vrai numéro derrière un identifiant "@lid" (confidentialité).
+// On retrouve le vrai numéro via les membres de groupe déjà chargés (p.phoneNumber).
+function realNum(s, jid) {
+  if (!isLid(jid)) return numOf(jid);
+  const pn = s.lidMap?.get(userPart(jid));
+  return pn ? '+' + userPart(pn) : numOf(jid) + ' (ID WhatsApp)';
+}
+function learnLids(s, participants) {
+  for (const p of participants || []) {
+    if (p.id && isLid(p.id) && p.phoneNumber) (s.lidMap ||= new Map()).set(userPart(p.id), p.phoneNumber);
+    if (p.lid && p.phoneNumber) (s.lidMap ||= new Map()).set(userPart(p.lid), p.phoneNumber);
+  }
+}
+const PRES_LABEL = { available: '🟢 En ligne', composing: '✍️ En train d\'écrire…', recording: '🎤 Enregistre un vocal…', unavailable: '⚪ Hors ligne', paused: '⚪ Hors ligne' };
 const b = (t, d) => Markup.button.callback(t, d);
 const kb = (rows) => Markup.inlineKeyboard(rows);
 const cancelKb = kb([[b('❌ Annuler', 'cancel')]]);
@@ -240,7 +284,8 @@ function newSession(uid) {
   if (getUser(uid).settings.save) { try { cache = { ...empty, ...JSON.parse(fs.readFileSync(cacheFile(uid), 'utf8')) }; } catch {} }
   for (const j of getUser(uid).channels) cache.news[j] ||= {};
   return { uid, sock: null, ready: false, number: null, cache, refs: new Map(), rev: new Map(), cur: null, last: null,
-    groups: {}, gmeta: {}, chanMeta: {}, search: [], fresh: false, done: new Set(), timer: null };
+    groups: {}, gmeta: {}, chanMeta: {}, search: [], fresh: false, done: new Set(), timer: null,
+    lidMap: new Map(), presence: new Map() };
 }
 function scheduleSave(s) {
   if (!getUser(s.uid).settings.save) return;
@@ -325,13 +370,18 @@ const adminRole = (g, s) => g.participants.find((p) => isMe(s, p))?.admin || nul
 async function fetchGroups(s) {
   const all = await s.sock.groupFetchAllParticipating();
   s.groups = all;
-  for (const g of Object.values(all)) ingestChat(s, { id: g.id, name: g.subject });
+  for (const g of Object.values(all)) { ingestChat(s, { id: g.id, name: g.subject }); learnLids(s, g.participants); }
   return Object.values(all);
 }
 async function groupName(s, jid) {
   const n = s.cache.chats[jid]?.name;
   if (n) return n;
-  try { const md = await s.sock.groupMetadata(jid); s.gmeta[jid] = md; ingestChat(s, { id: jid, name: md.subject }); return md.subject; } catch { return 'Groupe'; }
+  try { const md = await s.sock.groupMetadata(jid); s.gmeta[jid] = md; ingestChat(s, { id: jid, name: md.subject }); learnLids(s, md.participants); return md.subject; } catch { return 'Groupe'; }
+}
+async function groupMeta(s, jid) {
+  const md = s.gmeta[jid] || await s.sock.groupMetadata(jid);
+  s.gmeta[jid] = md; learnLids(s, md.participants);
+  return md;
 }
 async function chanMeta(s, jid) {
   const c = s.chanMeta[jid];
@@ -406,6 +456,7 @@ async function connectWA(uid, { number = null, fresh = false } = {}) {
     chats.forEach((c) => ingestChat(s, c));
     messages.forEach((m) => ingestMsg(s, m, false));
   });
+  sock.ev.on('presence.update', ({ presences }) => { for (const [k, v] of Object.entries(presences || {})) s.presence.set(k, v); });
   sock.ev.on('contacts.upsert', (cs) => cs.forEach((c) => ingestContact(s, c)));
   sock.ev.on('contacts.update', (cs) => cs.forEach((c) => ingestContact(s, c)));
   sock.ev.on('chats.upsert', (cs) => cs.forEach((c) => ingestChat(s, c)));
@@ -445,7 +496,7 @@ async function waCommand(s, m, e) {
     case 'ping': return say2('waPing', `🏓 *Pong !*\n⚡ Vitesse : ${Math.max(0, Date.now() - e.ts * 1000)} ms\n🟢 Statut : OPEN`);
     case 'tagall': case 'hidetag': case 'link': case 'infos': {
       if (!isGroup(jid)) return say2('waInfo', '⚠️ Commande réservée aux groupes.');
-      const g = await sock.groupMetadata(jid);
+      const g = await groupMeta(s, jid);
       const mentions = g.participants.map((p) => p.id);
       if (cmd === 'tagall') return say2('waTag', `📢 *TAG ALL*\n${args.join(' ')}\n\n` + mentions.map((j) => `@${userPart(j)}`).join('\n'), { mentions });
       if (cmd === 'hidetag') return say2('waTag', args.join(' ') || '📢', { mentions });
@@ -466,7 +517,7 @@ async function notifyIncoming(s, m, e) {
   await say(s.uid, 'notif', T.incoming({
     where: grp ? `👥 Groupe : ${esc(await groupName(s, jid))}\n` : '',
     who: esc(m.pushName || nameOf(s, m.key.participant || jid)),
-    num: esc(numOf(m.key.participant || jid)),
+    num: esc(realNum(s, m.key.participant || jid)),
     text: st.preview ? `« ${esc(trunc(e.text, 500))} »` : '(aperçu masqué)',
   }), kb([[b('✍️ Répondre', `c:reply:${id}`), b('📜 Ouvrir la conversation', `c:open:${id}`)], [b('🔕 Mute cette conversation', `c:mute:${id}`), b('🗑 Supprimer', `c:del:${id}`)]]));
 }
@@ -517,7 +568,7 @@ bot.command('pair', H(async (ctx) => {
   const number = raw.replace(/\D/g, '');
   if (raw.includes('+') || number.length < 8 || number.length > 15) return say(ctx, 'pairError', T.pairError());
   const u = getUser(ctx.from.id);
-  if (!isPremium(u) && u.tries >= FREE_TRIES) return say(ctx, 'error', '🚫 Essais gratuits épuisés.\nTape /premium ou /code.');
+  if (!isPremium(u) && u.tries >= FREE_TRIES) return showPremiumDenied(ctx);
   if (sessions.get(ctx.from.id)?.ready) return say(ctx, 'error', "ℹ️ Un WhatsApp est déjà lié.\nTape /unpair d'abord.");
   await say(ctx, 'pair', T.pairConsent(number), kb([[b("✅ J'accepte", `pair:${number}`), b('❌ Annuler', 'cancel')]]));
 }));
@@ -555,32 +606,55 @@ bot.command('unpair', H(async (ctx) => {
   await ok(ctx, '🔌 WhatsApp déconnecté.\nSession et cache supprimés ✅');
 }));
 
-// ═════════════════════════ PREMIUM / CODES / SHOP ═════════════════════════
-bot.command('premium', H((ctx) => {
+// ═════════════════════════ PREMIUM (Telegram Stars ⭐️) / CODES / SHOP ═════════════════════════
+const premiumKb = () => kb([[b('💳 Payer', 'pr:pay'), b('🔐 Code promo', 'pr:code')]]);
+async function showPremium(ctx) {
   const u = getUser(ctx.from.id);
   const st = isPremium(u) ? `🟢 Premium actif jusqu'au ${new Date(u.premiumUntil).toLocaleDateString('fr-FR')}` : '⚪ Pas de premium actif';
-  const rows = [];
-  if (!u.trialUsed) rows.push([b(`🎁 Activer ${TRIAL_DAYS / 30} mois gratuits`, 'pr:trial')]);
-  rows.push([Markup.button.url('💳 Payer / Contacter', SUPPORT_URL)]);
-  return say(ctx, 'premium', T.premium(st), kb(rows));
+  await say(ctx, 'premium', T.premium(st), premiumKb());
+}
+async function showPremiumDenied(ctx) {
+  await say(ctx, 'premium', T.premiumDenied(), kb([[b('🔐 /code promos', 'pr:code'), b('💶 Acheter un code promo', 'pr:buycode')]]));
+}
+bot.command('premium', H((ctx) => showPremium(ctx)));
+bot.action('pr:pay', H(async (ctx) => {
+  await ack(ctx);
+  await ctx.replyWithInvoice({
+    title: 'Premium Shadow Kira Bot',
+    description: `Accès illimité au bot pendant ${TRIAL_DAYS / 30} mois (appairages WhatsApp illimités, support prioritaire).`,
+    payload: `premium_${ctx.from.id}_${Date.now()}`,
+    provider_token: '', // Telegram Stars : aucun provider_token
+    currency: 'XTR',
+    prices: [{ label: `Premium ${TRIAL_DAYS / 30} mois`, amount: STAR_PRICE }],
+  }).catch(async (e) => {
+    console.error('Invoice KO:', e.message);
+    await say(ctx, 'error', "⚠️ Paiement par Stars indisponible pour le moment.\nUtilise 📩 Support pour payer autrement.", kb([[Markup.button.url('📩 Support', SUPPORT_URL)]]));
+  });
 }));
-bot.action('pr:trial', H(async (ctx) => {
-  const u = getUser(ctx.from.id);
-  if (u.trialUsed) return ack(ctx, 'Essai déjà utilisé.', true);
-  u.trialUsed = true; u.premiumUntil = Date.now() + TRIAL_DAYS * 86400000; saveDb();
-  await ack(ctx, '✅ Premium activé !', true);
-  ctx.deleteMessage().catch(() => {});
-  await ok(ctx, `💎 <b>Premium activé</b> ✅\nValable jusqu'au ${new Date(u.premiumUntil).toLocaleDateString('fr-FR')}`);
-}));
+bot.on('pre_checkout_query', (ctx) => ctx.answerPreCheckoutQuery(true).catch(() => {}));
+bot.use(async (ctx, next) => { // capte le paiement Stars avant tout autre traitement de message
+  const sp = ctx.update?.message?.successful_payment;
+  if (sp) {
+    const u = getUser(ctx.from.id);
+    u.premiumUntil = Date.now() + TRIAL_DAYS * 86400000; u.trialUsed = true; saveDb();
+    const username = ctx.from.username ? '@' + ctx.from.username : ctx.from.first_name;
+    await say(ctx, 'premiumPaid', T.premiumPaid(sp.total_amount, esc(username)), kb([[b('Utiliser le bot 🤖', 'pr:use')]])).catch(() => {});
+    return;
+  }
+  return next();
+});
+bot.action('pr:use', H(async (ctx) => { await ack(ctx); await say(ctx, 'pair', T.pairUsage()); }));
+bot.action('pr:code', H(async (ctx) => { await ack(ctx); await say(ctx, 'code', T.code()); }));
+bot.action('pr:buycode', H(async (ctx) => { await ack(ctx); await say(ctx, 'error', '💶 Pour acheter un code promo, contacte le support.', kb([[Markup.button.url('📩 Support', SUPPORT_URL)]])); }));
 bot.command('code', H(async (ctx) => {
   const c = (ctx.message.text.split(/\s+/)[1] || '').toUpperCase();
   if (!c) return say(ctx, 'code', T.code());
   const entry = db.codes[c], u = getUser(ctx.from.id);
-  if (!entry) return say(ctx, 'error', '❌ Code invalide.');
+  if (!entry) return say(ctx, 'error', T.codeBad());
   entry.used ||= {};
-  if (entry.used[ctx.from.id]) return say(ctx, 'error', '⚠️ Code déjà utilisé.');
+  if (entry.used[ctx.from.id]) return say(ctx, 'error', T.codeBad());
   entry.used[ctx.from.id] = true; u.tries = Math.max(0, u.tries - entry.tries); saveDb();
-  await ok(ctx, `✅ <b>Code validé</b>\n+${entry.tries} essai(s) gratuit(s) ajouté(s).`);
+  await ok(ctx, T.codeOk(entry.tries), kb([[b('🔗 Tenter /pair', 'pr:use')]]));
 }));
 bot.command('addcode', H(async (ctx) => {
   if (!ADMIN_ID || ctx.from.id !== ADMIN_ID) return;
@@ -589,7 +663,34 @@ bot.command('addcode', H(async (ctx) => {
   db.codes[code.toUpperCase()] = { tries: Number(n) || 1, used: {} }; saveDb();
   await ok(ctx, `✅ Code <b>${esc(code.toUpperCase())}</b> créé (+${Number(n) || 1} essais).`);
 }));
-bot.command('shop', H((ctx) => say(ctx, 'shop', T.shop(), kb([[Markup.button.url('💬 Voir le catalogue', SUPPORT_URL)]]))));
+
+// ───────────── /shop ─────────────
+bot.command('shop', H(async (ctx) => {
+  const lines = SHOP.map((p, i) => `* ${p.name} — [ ${p.price === 0 ? '0 f' : p.price + ' f'} ]`).join('\n');
+  const rows = [];
+  for (let i = 0; i < SHOP.length; i += 2) rows.push(SHOP.slice(i, i + 2).map((p) => b(trunc(p.name, 24), `sh:${p.id}`)));
+  rows.push([Markup.button.url('📩 Support', SUPPORT_HUB)]);
+  await say(ctx, 'shop', T.shopHeader(lines), kb(rows));
+}));
+bot.action('sh:back', H(async (ctx) => { await ack(ctx); ctx.deleteMessage().catch(() => {}); await bot.telegram.sendMessage(ctx.chat.id, 'Tape /shop pour revoir la boutique.'); }));
+bot.action(/^sh:buy:(\w+)$/, H(async (ctx) => {
+  await ack(ctx);
+  const item = SHOP.find((p) => p.id === ctx.match[1]);
+  if (!item) return;
+  const username = ctx.from.username ? '@' + ctx.from.username : ctx.from.first_name;
+  const demand = T.shopDemand(username, item.name, item.price);
+  await show(ctx, 'shop', `🛍 <b>Demande d'achat prête</b>\n${L}\n<code>${esc(demand)}</code>\n\nCopie ce message et colle-le dans le groupe achats 👇`, kb([
+    [{ text: '📄 Copier la demande', copy_text: { text: demand } }], [Markup.button.url('👥 Ouvrir le groupe achats', LINKS.tgGroup2)], [Markup.button.url('📩 Support', SUPPORT_HUB)],
+  ]));
+}));
+bot.action(/^sh:(\w+)$/, H(async (ctx) => {
+  await ack(ctx);
+  const item = SHOP.find((p) => p.id === ctx.match[1]);
+  if (!item) return;
+  await show(ctx, 'shop', T.shopItem(esc(item.name), item.price), kb([
+    [b('🛍 Acheter', `sh:buy:${item.id}`), Markup.button.url('📩 Support', SUPPORT_HUB)], [b('⬅️ Retour', 'sh:back')],
+  ]));
+}));
 
 // ═════════════════════════ TABLEAU DE BORD ═════════════════════════
 async function showDashboard(uid, ctx) {
@@ -600,7 +701,7 @@ async function showDashboard(uid, ctx) {
   try { groups = await fetchGroups(s); gAdmin = groups.filter((g) => adminRole(g, s)).length; } catch {}
   const news = Object.keys(s.cache.news);
   let cAdmin = 0;
-  await Promise.allSettled(news.slice(0, 30).map(async (j) => { if (isChanAdmin(await chanMeta(s, j))) cAdmin++; }));
+    await Promise.allSettled(news.slice(0, 30).map(async (j) => { if (isChanAdmin(await chanMeta(s, j))) cAdmin++; }));
   const indiv = Object.values(s.cache.chats).filter((c) => !isGroup(c.jid));
   const text = T.dashboard({
     number: esc(s.number), groups: groups.length, gAdmin, news: news.length, cAdmin,
@@ -646,6 +747,20 @@ bot.action('m:grp', H(async (ctx) => {
     [b('🚪 Quitter le groupe', 'gp:leave:0')], [b('🗑 Révoker tous les admins', 'gp:revoke:0')], [b('⬅️ Retour', 'm:dash')],
   ]));
 }));
+// Écran détail d'un groupe : nom, membres, admins, lien, écrire, renommer, nommer admin, quitter.
+async function openGroup(ctx, s, gid) {
+  const id = ref(s, gid);
+  let g; try { g = await groupMeta(s, gid); } catch { return say(ctx, 'error', '⚠️ Groupe introuvable ou inaccessible.'); }
+  const role = adminRole(g, s);
+  const text = `👥 <b>${esc(g.subject)}</b>\n${L}\n👤 Membres : ${g.participants.length}\n👑 Admins : ${g.participants.filter((p) => p.admin).length}\n🔰 Toi : ${role ? 'admin' : 'non admin'}\n📅 Créé : ${new Date(g.creation * 1000).toLocaleDateString('fr-FR')}\n📝 ${esc(trunc(g.desc || '—', 150))}`;
+  await show(ctx, 'groups', text, kb([
+    [b('✍️ Écrire un message', `g:msg:${id}`), b('👥 Voir les membres', `g:mem:${id}`)],
+    [b('👑 Nommer admin', `g:promote:${id}`), b('⬇️ Retirer admin', `g:demote:${id}`)],
+    [b('🔗 Lien du groupe', `g:link:${id}`), b('✏️ Renommer', `g:rename:${id}`)],
+    [b('🚪 Quitter', `g:leave:${id}`), b('🔄 Rafraîchir', `g:open:${id}`)],
+    [b('⬅️ Retour', 'gp:list:0')],
+  ]));
+}
 function paginate(items, page) {
   const pages = Math.max(1, Math.ceil(items.length / PAGE));
   page = Math.min(Math.max(0, page), pages - 1);
@@ -668,7 +783,8 @@ bot.action(/^gp:(\w+):(\d+)$/, H(async (ctx) => {
   const { slice, page, pages } = paginate(groups, Number(pg));
   const lines = slice.map((g, i) => `${NUM[i]} | <b>${esc(trunc(g.subject, 30))}</b> → ${g.participants.length} → (${adminRole(g, s) ? 'admin' : 'non admin'})`);
   const rows = [];
-  if (act !== 'list') for (let i = 0; i < slice.length; i += 2) rows.push(slice.slice(i, i + 2).map((g, k) => b(`${NUM[i + k]} ${trunc(g.subject, 18)}`, `g:${act}:${ref(s, g.id)}`)));
+  const dest = act === 'list' ? 'open' : act;
+  for (let i = 0; i < slice.length; i += 2) rows.push(slice.slice(i, i + 2).map((g, k) => b(`${NUM[i + k]} ${trunc(g.subject, 18)}`, `g:${dest}:${ref(s, g.id)}`)));
   const nav = navRow(`gp:${act}`, page, pages); if (nav.length) rows.push(nav);
   rows.push([b('⬅️ Retour', 'm:grp')]);
   const title = { list: '📋 LISTE DES GROUPES', add: '➕ AJOUTER UN MEMBRE', promote: '👑 NOMMER UN ADMIN', demote: '⬇️ RETIRER UN ADMIN', leave: '🚪 QUITTER UN GROUPE', revoke: '🗑 RÉVOQUER LES ADMINS' }[act];
@@ -679,6 +795,20 @@ bot.action(/^g:(\w+):(\w+)$/, H(async (ctx) => {
   const [, act, id] = ctx.match, gid = jidOf(s, id), uid = ctx.from.id;
   if (!gid) return say(ctx, 'error', '⌛ Liste expirée.\nRelance /wa.');
   const name = await groupName(s, gid);
+  if (act === 'open') return openGroup(ctx, s, gid);
+  if (act === 'msg') { states.set(uid, { type: 'gmsg', gid }); return ask(ctx, `✍️ Groupe : <b>${esc(name)}</b>\nEnvoie le <b>message</b> (texte, image, vidéo ou document) à publier :`); }
+  if (act === 'rename') { states.set(uid, { type: 'grename', gid }); return ask(ctx, `✏️ Groupe : <b>${esc(name)}</b>\nEnvoie le <b>nouveau nom</b> du groupe :`); }
+  if (act === 'mem') {
+    const g = await groupMeta(s, gid);
+    const list = g.participants.map((p) => `${p.admin ? '👑' : '👤'} ${esc(nameOf(s, p.id))} (${esc(p.phoneNumber ? numOf(p.phoneNumber) : realNum(s, p.id))})`);
+    return show(ctx, 'groups', `👥 <b>MEMBRES — ${esc(name)}</b>\n${L}\n${list.slice(0, 50).join('\n')}${list.length > 50 ? `\n… +${list.length - 50}` : ''}`, kb([[b('⬅️ Retour', `g:open:${id}`)]]));
+  }
+  if (act === 'link') {
+    try {
+      const code = await s.sock.groupInviteCode(gid);
+      return show(ctx, 'groups', `🔗 <b>Lien d'invitation</b>\nGroupe : ${esc(name)}\n${L}\nhttps://chat.whatsapp.com/${code}`, kb([[{ text: '📄 Copier le lien', copy_text: { text: `https://chat.whatsapp.com/${code}` } }], [b('⬅️ Retour', `g:open:${id}`)]]));
+    } catch { return say(ctx, 'error', '⚠️ Impossible de récupérer le lien.\nIl faut être admin du groupe.', kb([[b('⬅️ Retour', `g:open:${id}`)]])); }
+  }
   if (act === 'add' || act === 'promote' || act === 'demote') {
     states.set(uid, { type: 'gnum', act, gid });
     const hint = act === 'add' ? '📲 Envoie le <b>numéro à ajouter</b> (format international)\nEx : +242 06 123 45 67' : '📲 Envoie le <b>numéro du membre</b> (format international)';
@@ -700,7 +830,7 @@ bot.action(/^g:(\w+):(\w+)$/, H(async (ctx) => {
     return show(ctx, 'groups', `🗑 <b>Retirer tous les admins de « ${esc(name)} » ?</b>\nLe créateur et ton propre compte ne sont jamais retirés.`, kb([[b('🗑 Retirer tous les admins', `g:revokeok:${id}`)], [b('⬅️ Retour', 'm:grp')]]));
   }
   if (act === 'revokeok') {
-    const g = await s.sock.groupMetadata(gid);
+    const g = await groupMeta(s, gid);
     const targets = g.participants.filter((p) => p.admin === 'admin' && !isMe(s, p)).map((p) => p.id);
     for (let i = 0; i < targets.length; i += 20) await s.sock.groupParticipantsUpdate(gid, targets.slice(i, i + 20), 'demote');
     return show(ctx, 'groups', T.revoked(targets.length), kb([[b('⬅️ Retour', 'm:grp')]]));
@@ -722,7 +852,7 @@ async function groupNumberAction(ctx, s, st) {
     msg = "🔗 Ajout direct impossible (confidentialité) : lien d'invitation envoyé en privé.";
   } else if (status === '408') msg = '⚠️ Impossible : la personne a quitté récemment le groupe.';
   else msg = `⚠️ Échec (code ${esc(status || 'inconnu')}).\nVérifie que tu es admin du groupe.`;
-  await say(ctx, 'groups', msg, kb([[b('⬅️ Retour', 'm:grp')]]));
+  await say(ctx, 'groups', msg, kb([[b('⬅️ Retour au groupe', `g:open:${ref(s, st.gid)}`)], [b('⬅️ Menu groupes', 'm:grp')]]));
 }
 
 // ═════════════════════════ CHAÎNES ═════════════════════════
@@ -736,13 +866,14 @@ bot.action(/^m:chn$|^np:(\d+)$/, H(async (ctx) => {
   const rows = [];
   for (let i = 0; i < slice.length; i += 2) rows.push(slice.slice(i, i + 2).map((c, k) => b(`${NUM[i + k]} ${trunc(c.name, 18)}`, `n:open:${ref(s, c.jid)}`)));
   const nav = navRow('np', page, pages); if (nav.length) rows.push(nav);
-  rows.push([b('➕ Ajouter une chaîne (lien)', 'n:add:0')], [b('⬅️ Retour', 'm:dash')]);
+  rows.push([b('➕ Ajouter une chaîne (lien)', 'n:add:0'), b('🆕 Créer une chaîne', 'n:create:0')], [b('⬅️ Retour', 'm:dash')]);
   await show(ctx, 'channels', `📊 <b>LISTE DES CHAÎNES</b>\n${L}\n${lines.join('\n') || 'Aucune chaîne détectée pour le moment.\nUtilise ➕ pour ajouter une chaîne avec son lien.'}\n${L}\nPage ${page + 1}/${pages}`, kb(rows));
 }));
 bot.action(/^n:(\w+):(\w+)$/, H(async (ctx) => {
   await ack(ctx); const s = await needWA(ctx); if (!s) return;
   const uid = ctx.from.id, [, act, id] = ctx.match;
   if (act === 'add') { states.set(uid, { type: 'chadd' }); return ask(ctx, '🔗 Envoie le <b>lien de ta chaîne</b> (https://whatsapp.com/channel/…) :'); }
+  if (act === 'create') { states.set(uid, { type: 'chcreate' }); return ask(ctx, '🆕 Envoie le <b>nom</b> de la nouvelle chaîne :'); }
   const jid = jidOf(s, id);
   if (!jid) return say(ctx, 'error', '⌛ Liste expirée.\nRouvre le menu des chaînes.');
   const meta = await chanMeta(s, jid).catch(() => null);
@@ -861,10 +992,13 @@ async function convText(s, jid, limit = 12) {
   const c = s.cache.chats[jid] || {};
   let head;
   if (isGroup(jid)) {
-    let g = s.gmeta[jid]; if (!g) { try { g = s.gmeta[jid] = await s.sock.groupMetadata(jid); } catch {} }
+    let g; try { g = await groupMeta(s, jid); } catch {}
     head = `👥 <b>GROUPE : ${esc(nameOf(s, jid))}</b>\n${L}\n👤 Membres : ${g?.participants?.length ?? '?'}\n👑 Admins : ${g ? g.participants.filter((p) => p.admin).length : '?'}\n📅 Dernier message : ${fmtTime(c.ts)}`;
   } else {
-    head = `💬 <b>CONVERSATION</b>\n${L}\n👤 Contact : ${esc(nameOf(s, jid))}\n📞 Numéro  : ${esc(numOf(jid))}\n📅 Dernier message : ${fmtTime(c.ts)}`;
+    s.sock.presenceSubscribe(jid).catch(() => {});
+    const pres = s.presence.get(jid);
+    const statusLine = pres ? (PRES_LABEL[pres.lastKnownPresence] || PRES_LABEL.unavailable) : '⚪ Inconnu';
+    head = `💬 <b>CONVERSATION</b>\n${L}\n👤 Contact : ${esc(nameOf(s, jid))}\n📞 Numéro  : ${esc(realNum(s, jid))}\nStatut  : ${statusLine}\n📅 Dernier message : ${fmtTime(c.ts)}`;
   }
   const body = arr.length ? arr.map((e) => `[${fmtTime(e.ts)}] ${e.fromMe ? '🤖 Moi' : '👤 ' + esc(trunc(e.who, 20))} :\n${esc(trunc(e.text, 160))}`).join('\n\n') : 'Aucun message en cache pour cette conversation (les nouveaux messages apparaîtront ici).';
   return `${head}\n${L}\n📜 <b>HISTORIQUE (${arr.length} derniers messages)</b>\n─────────────────────────\n${body}\n─────────────────────────`;
@@ -961,18 +1095,18 @@ bot.action(/^c:(\w+):(\w+)(?::(.+))?$/, H(async (ctx) => {
       const pic = await s.sock.profilePictureUrl(jid, 'image').catch(() => null);
       let text;
       if (isGroup(jid)) {
-        const g = await s.sock.groupMetadata(jid);
+        const g = await groupMeta(s, jid);
         text = `👥 <b>${esc(g.subject)}</b>\n${L}\n👤 Membres : ${g.participants.length}\n👑 Admins : ${g.participants.filter((p) => p.admin).length}\n📅 Créé : ${new Date(g.creation * 1000).toLocaleDateString('fr-FR')}\n📝 ${esc(trunc(g.desc || '—', 200))}`;
       } else {
         const st = await s.sock.fetchStatus(jid).catch(() => null);
         const bio = st?.[0]?.status?.status ?? st?.status?.status ?? '—';
-        text = `${L}\n👤 <b>INFORMATIONS CONTACT</b>\n${L}\n📛 Nom    : ${esc(name)}\n📞 Numéro : ${esc(numOf(jid))}\n📝 Bio    : « ${esc(trunc(bio, 150))} »\n🔒 Type   : ${s.cache.contacts[jid]?.name ? 'Contact enregistré' : 'Non enregistré'}\n${L}\n📅 Dernière interaction : ${fmtTime(c.ts)}\n💬 Messages en cache : ${(s.cache.msgs[jid] || []).length}`;
+        text = `${L}\n👤 <b>INFORMATIONS CONTACT</b>\n${L}\n📛 Nom    : ${esc(name)}\n📞 Numéro : ${esc(realNum(s, jid))}\n📝 Bio    : « ${esc(trunc(bio, 150))} »\n🔒 Type   : ${s.cache.contacts[jid]?.name ? 'Contact enregistré' : 'Non enregistré'}\n${L}\n📅 Dernière interaction : ${fmtTime(c.ts)}\n💬 Messages en cache : ${(s.cache.msgs[jid] || []).length}`;
       }
       return send(ctx.chat.id, { img: pic || IMG.conv, text, kb: kb([[b('⬅️ Retour', `c:open:${id}`)]]) });
     }
     case 'members': case 'admins': {
-      const g = await s.sock.groupMetadata(jid);
-      const list = g.participants.filter((p) => act === 'members' || p.admin).map((p) => `${p.admin ? '👑' : '👤'} ${esc(nameOf(s, p.id))} (${esc(numOf(p.phoneNumber || p.id))})`);
+      const g = await groupMeta(s, jid);
+      const list = g.participants.filter((p) => act === 'members' || p.admin).map((p) => `${p.admin ? '👑' : '👤'} ${esc(nameOf(s, p.id))} (${esc(p.phoneNumber ? numOf(p.phoneNumber) : realNum(s, p.id))})`);
       return show(ctx, 'conv', `${act === 'members' ? '👥 MEMBRES' : '👑 ADMINS'} — ${esc(g.subject)}\n${L}\n${list.slice(0, 40).join('\n')}${list.length > 40 ? `\n… +${list.length - 40}` : ''}`, kb([[b('⬅️ Retour', `c:open:${id}`)]]));
     }
   }
@@ -1063,6 +1197,19 @@ bot.on(['text', 'photo', 'video', 'video_note', 'voice', 'audio', 'document', 'l
       states.delete(uid); return ok(ctx, `✅ Statut publié (visible par ${list.length} contact(s) connus du bot).`);
     }
     case 'gnum': if (!m.text) return wrong(); return groupNumberAction(ctx, s, st);
+    case 'gmsg': {
+      const c = (await buildContent(m, 'text')) || (await buildContent(m, 'image')) || (await buildContent(m, 'video')) || (await buildContent(m, 'document')); if (!c) return wrong();
+      await sock.sendMessage(st.gid, c); states.delete(uid); return ok(ctx, '✅ Message envoyé dans le groupe.', kb([[b('⬅️ Retour', `g:open:${ref(s, st.gid)}`)]]));
+    }
+    case 'grename': if (!m.text) return wrong(); await sock.groupUpdateSubject(st.gid, m.text.slice(0, 100)); states.delete(uid); return ok(ctx, '✅ Nom du groupe modifié.', kb([[b('⬅️ Retour', `g:open:${ref(s, st.gid)}`)]]));
+    case 'chcreate': if (!m.text) return wrong(); states.set(uid, { type: 'chdesc', name: m.text.slice(0, 50) }); return ask(ctx, '📝 Envoie la <b>description</b> de la chaîne (ou "-" pour aucune) :');
+    case 'chdesc': {
+      if (!m.text) return wrong();
+      const desc = m.text.trim() === '-' ? '' : m.text.slice(0, 200);
+      const meta = await sock.newsletterCreate(st.name, desc);
+      addNews(s, meta.id, meta.name || st.name); s.chanMeta[meta.id] = { m: meta, t: Date.now() }; states.delete(uid);
+      return ok(ctx, `✅ Chaîne créée : <b>${esc(meta.name || st.name)}</b> 🎉`, kb([[b('📊 Mes chaînes', 'm:chn')]]));
+    }
     case 'chnum': if (!m.text) return wrong(); return channelNumberAction(ctx, s, st);
     case 'chname': if (!m.text) return wrong(); await sock.newsletterUpdateName(st.jid, m.text); states.delete(uid); return ok(ctx, '✅ Nom de la chaîne modifié.');
     case 'chpic': {
@@ -1081,7 +1228,7 @@ bot.on(['text', 'photo', 'video', 'video_note', 'voice', 'audio', 'document', 'l
       return ok(ctx, `✅ Chaîne ajoutée : <b>${esc(meta.name)}</b>\nRôle détecté : ${esc(chanRole(meta) || 'inconnu')}`, kb([[b('📊 Mes chaînes', 'm:chn')]]));
     }
     case 'search': {
-      if (!m.text) return wrong(); states.delete(uid);
+            if (!m.text) return wrong(); states.delete(uid);
       s.search = runSearch(s, m.text.trim());
       return showList(ctx, s, 'search', 0);
     }
@@ -1099,7 +1246,18 @@ bot.catch((err) => console.error('Erreur bot:', err));
 
 // ═════════════════════════ DEMARRAGE ═════════════════════════
 for (const id of fs.readdirSync(SESSIONS_DIR)) if (/^\d+$/.test(id)) connectWA(Number(id)).catch(console.error);
-http.createServer((_, res) => res.end('Shadow Kira Bot OK')).listen(process.env.PORT || 3000);
+http.createServer((_, res) => res.end('Shadow Kira Bot OK — ' + new Date().toISOString())).listen(process.env.PORT || 3000);
+
+// Anti-sommeil Render (plan gratuit) : le service s'appelle lui-même toutes les 5 minutes.
+// RENDER_EXTERNAL_URL est fourni automatiquement par Render ; SELF_URL en secours ailleurs.
+const SELF_URL = process.env.RENDER_EXTERNAL_URL || process.env.SELF_URL;
+if (SELF_URL) {
+  setInterval(() => {
+    fetch(SELF_URL).then(() => console.log('⏰ Auto-ping OK —', new Date().toLocaleTimeString('fr-FR'))).catch((e) => console.log('⏰ Auto-ping échoué :', e.message));
+  }, 5 * 60 * 1000);
+} else {
+  console.log("⚠️ SELF_URL/RENDER_EXTERNAL_URL absent : le service peut s'endormir sur le plan gratuit Render.");
+}
 
 // Telegraf 4 : launch() ne se termine qu'à l'arrêt du bot, d'où le callback de démarrage.
 bot.launch({ dropPendingUpdates: true }, async () => {
@@ -1114,4 +1272,3 @@ bot.launch({ dropPendingUpdates: true }, async () => {
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
-      
